@@ -2,6 +2,7 @@
 // και η κορυφή της Αρχικής (υπόλοιπο λεπτών).
 import { register } from '../core/registry.js';
 import { placeholder, navigate } from '../core/router.js';
+import { getSessions } from './timer.js';
 
 register({
   id: 'wallet',
@@ -11,7 +12,9 @@ register({
   nav: true,
   // Η κορυφή της Αρχικής: πόσα λεπτά scroll έχεις κερδίσει
   renderHomeHero(el) {
-    const balance = 0; // θα έρχεται από τα δεδομένα στο βήμα του πορτοφολιού
+    // Προσωρινά: ό,τι κέρδισες από timers. Στο βήμα του πορτοφολιού
+    // θα αφαιρούνται και τα λεπτά που ξόδεψες.
+    const balance = getSessions().reduce((sum, s) => sum + s.earned, 0);
     el.innerHTML = `
       <p class="hero-label">Scroll time earned</p>
       <p class="hero-number"><strong>${balance}</strong><span>min</span></p>

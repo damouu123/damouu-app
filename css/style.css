@@ -504,6 +504,128 @@ main { padding: 0 20px 32px; }
 }
 .notice p { margin: 0 0 12px; }
 
+/* ===== Focus: οθόνη επιλογής ===== */
+.section-title.first { margin-top: 8px; }
+
+.activity-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.activity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 92px;
+  padding: 12px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.activity.selected { border-color: var(--lamp); color: var(--lamp); background: var(--surface); }
+
+.duration {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.duration p {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--serif);
+}
+.duration strong { font-size: 64px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.duration span { font-size: 22px; color: var(--muted); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.chip {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.chip.selected { border-color: var(--lamp); color: var(--lamp); }
+
+.earn-line { margin: 20px 0 16px; color: var(--lamp); }
+.small-print { margin: 14px 0 0; font-size: 14px; }
+.row-value.earned { color: var(--lamp); }
+
+/* ===== Focus: κλειδωμένη οθόνη ===== */
+body.locked { overflow: hidden; }
+
+.focus-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  padding: calc(var(--safe-top) + 48px) 24px calc(var(--safe-bottom) + 24px);
+  background: var(--bg);
+  overflow-y: auto;
+}
+.focus-inner { margin: auto 0; }
+.focus-activity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  color: var(--muted);
+}
+.focus-time {
+  margin: 8px 0 20px;
+  font-family: var(--serif);
+  font-size: clamp(72px, 24vw, 120px);
+  font-weight: 500;
+  line-height: 1;
+  color: var(--lamp);
+  font-variant-numeric: lining-nums tabular-nums;
+  letter-spacing: -0.02em;
+}
+.focus-progress span { background: var(--lamp); transition: none; }
+.focus-inner .muted { margin: 14px 0 0; font-size: 15px; }
+.focus-away[hidden] { display: none; }
+
+/* Κουμπί παρατεταμένου πατήματος */
+.hold-btn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  touch-action: none; /* χωρίς scroll/zoom όσο κρατάς πατημένο */
+}
+.hold-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--danger);
+  opacity: 0.35;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.hold-label { position: relative; }
+
+.confirm h2 { margin: 0 0 10px; font-family: var(--serif); font-size: 28px; font-weight: 600; }
+
 /* ===== Toast: σύντομο μήνυμα που σβήνει μόνο του ===== */
 .toast {
   position: fixed;
