@@ -1,18 +1,26 @@
-/* ===== Χρώματα και μεγέθη (αλλάζεις εδώ, αλλάζει παντού) ===== */
+/* ===== Χρώματα, γραμματοσειρές, μεγέθη (αλλάζεις εδώ, αλλάζει παντού) =====
+   Ιδέα: αναλόγιο διαβάσματος το βράδυ. Ζεστό σκούρο φόντο, κείμενο σαν χαρτί,
+   και κεχριμπαρένιο "φως λάμπας" μόνο για ό,τι κερδίζεις. */
 :root {
-  --bg: #0f1115;
-  --surface: #181b22;
-  --surface-2: #222632;
-  --border: #2c3140;
-  --text: #eef0f4;
-  --muted: #9aa1b2;
-  --accent: #4ade80;      /* πράσινο: επιτυχία, κέρδος λεπτών */
-  --accent-ink: #06240f;
-  --warn: #fbbf24;
-  --danger: #f87171;
-  --radius: 16px;
-  --tabbar-h: 64px;
-  /* Περιθώρια ασφαλείας για notch και home indicator του iPhone */
+  --bg: #1a1612;          /* σκούρο ξύλο */
+  --surface: #241f1a;     /* λίγο πιο ανοιχτό, για λίστες */
+  --surface-press: #2e2822;
+  --line: #3a322a;
+  --text: #efe7da;        /* χαρτί */
+  --muted: #a39a8c;
+  --lamp: #f0b350;        /* κεχριμπάρι: κερδισμένα λεπτά, κύρια κουμπιά */
+  --lamp-ink: #2a1d05;
+  --ink: #8fb0dc;         /* μπλε μελανιού: πανεπιστήμιο, XP */
+  --danger: #e2775c;
+
+  /* Γραμματοσειρές του iPhone: New York (serif) και SF (sans). Στα Windows πέφτει σε Georgia/Segoe. */
+  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
+  --sans: system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+
+  --r-lg: 20px;   /* μεγάλα κομμάτια */
+  --r-md: 14px;   /* κουμπιά */
+  --tabbar-h: 60px;
+  /* Περιθώρια ασφαλείας για notch και home indicator */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   color-scheme: dark;
@@ -24,9 +32,9 @@ html, body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  font-family: var(--sans);
   font-size: 17px;
-  line-height: 1.4;
+  line-height: 1.45;
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
 }
@@ -37,12 +45,25 @@ body {
   padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
 }
 
-/* Κουμπιά και links: χωρίς zoom στο διπλό πάτημα, χωρίς μενού στο παρατεταμένο */
-button, a, .tab {
+/* Χωρίς zoom στο διπλό πάτημα, χωρίς μενού στο παρατεταμένο πάτημα */
+button, a {
   touch-action: manipulation;
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
+}
+
+:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+
+svg.icon {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: none;
 }
 
 /* ===== Πάνω μπάρα ===== */
@@ -51,83 +72,132 @@ button, a, .tab {
   top: 0;
   z-index: 5;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 16px 10px;
+  padding: 18px 20px 6px;
   background: var(--bg);
 }
-.topbar h1 { margin: 0; font-size: 28px; font-weight: 700; }
+.topbar h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 
 .badge {
   font-size: 13px;
-  padding: 4px 10px;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--warn);
+  color: var(--muted);
 }
+.badge[hidden], .update-banner[hidden] { display: none; }
 
 /* ===== Περιεχόμενο ===== */
-main { padding: 4px 16px 24px; }
+main { padding: 0 20px 32px; }
 
 .muted { color: var(--muted); }
-.small { font-size: 14px; }
-.date-line { margin: 0 0 14px; text-transform: capitalize; }
+.subhead { margin: 0 0 28px; color: var(--muted); font-size: 15px; }
 
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 12px;
+.section-title {
+  margin: 36px 0 10px;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 600;
 }
-.placeholder { text-align: center; padding: 32px 18px; }
 
-/* ===== Κουμπιά (μεγάλα, εύκολα στο δάχτυλο) ===== */
+/* ===== Κουμπιά ===== */
 .btn {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 52px;
-  padding: 0 20px;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 22px;
   border: none;
-  border-radius: 14px;
-  background: var(--accent);
-  color: var(--accent-ink);
+  border-radius: var(--r-md);
+  background: var(--lamp);
+  color: var(--lamp-ink);
   font: inherit;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
 }
-.btn:active { transform: scale(0.97); }
-.btn-small { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.btn:active { filter: brightness(0.9); }
 .btn-block { width: 100%; }
-
-/* ===== Αρχική: κάρτες modules ===== */
-.home-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+.btn-quiet {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
 }
-.home-card {
+.btn-small { min-height: 40px; padding: 0 14px; font-size: 15px; }
+
+/* ===== Αρχική: το υπόλοιπο λεπτών (το μοναδικό "ηχηρό" στοιχείο) ===== */
+.hero { margin-top: 8px; }
+.hero-label { margin: 0; color: var(--muted); font-size: 15px; }
+.hero-number {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  min-height: 132px;
-  padding: 16px;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 6px;
+  font-family: var(--serif);
+  color: var(--lamp);
+  line-height: 1;
+}
+.hero-number strong {
+  font-size: 96px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.hero-number span { font-size: 26px; }
+.hero-hint { margin: 0 0 20px; color: var(--muted); font-size: 15px; max-width: 32ch; }
+
+/* ===== Λίστα σαν τις Ρυθμίσεις του iOS ===== */
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px 16px;
+  background: none;
+  border: none;
   color: var(--text);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.home-card:active { background: var(--surface-2); }
-.home-card-icon { font-size: 26px; }
-.home-card-title { font-weight: 600; }
-.home-card-value { font-size: 24px; font-weight: 700; color: var(--accent); margin-top: auto; }
-.home-card-label { font-size: 13px; color: var(--muted); }
+.list li + li .row { border-top: 1px solid var(--line); }
+.row:active { background: var(--surface-press); }
+.row .icon { color: var(--ink); }
+.row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.row-title { font-weight: 550; }
+.row-sub { font-size: 14px; color: var(--muted); }
+.row-value {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.row-chevron { color: var(--line); font-size: 22px; line-height: 1; }
+
+/* ===== Οθόνη που δεν έχει φτιαχτεί ακόμα ===== */
+.placeholder {
+  margin-top: 24px;
+  padding: 28px 22px;
+  border: 1px dashed var(--line);
+  border-radius: var(--r-lg);
+}
+.placeholder p { margin: 0 0 6px; }
 
 /* ===== Κάτω μπάρα πλοήγησης ===== */
 .tabbar {
@@ -139,10 +209,10 @@ main { padding: 4px 16px 24px; }
   display: flex;
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  background: rgba(15, 17, 21, 0.92);
-  border-top: 1px solid var(--border);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
+  background: rgba(26, 22, 18, 0.94);
+  border-top: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 .tab {
   flex: 1;
@@ -150,29 +220,27 @@ main { padding: 4px 16px 24px; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   color: var(--muted);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 550;
 }
-.tab-icon { font-size: 22px; line-height: 1; filter: grayscale(1); opacity: 0.7; }
-.tab.active { color: var(--accent); }
-.tab.active .tab-icon { filter: none; opacity: 1; }
+.tab.active { color: var(--lamp); }
 
 /* ===== Μήνυμα νέας έκδοσης ===== */
 .update-banner {
   position: fixed;
-  left: 12px;
-  right: 12px;
+  left: 16px;
+  right: 16px;
   bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
+  padding: 10px 10px 10px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
 }
-.update-banner[hidden], .badge[hidden] { display: none; }

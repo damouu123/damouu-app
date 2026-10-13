@@ -4,9 +4,9 @@ import { placeholder } from '../core/router.js';
 
 register({
   id: 'resume',
-  title: 'Εβδομάδα',
-  icon: '📊',
+  title: 'Weekly review',
+  icon: '<path d="M5 20v-8M12 20V5M19 20v-5"/>',
   order: 30,
-  homeCard: () => ({ value: '—', label: 'Ποσοστό παρουσίας' }),
-  render: (el) => placeholder(el, 'Σύνοψη εβδομάδας και σύγκριση με την προηγούμενη.'),
+  homeCard: () => ({ value: '', label: 'Attendance this week' }),
+  render: (el) => placeholder(el, 'How this week went, compared with last week.'),
 });

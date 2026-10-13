@@ -8,6 +8,8 @@ import { allModules, getModule } from './registry.js';
 const view = () => document.getElementById('view');
 let current = null; // το module που φαίνεται τώρα
 
+const HOME_ICON = '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>';
+
 export function navigate(id) {
   location.hash = `#/${id}`;
 }
@@ -18,35 +20,64 @@ export function escapeHtml(str) {
   ));
 }
 
+// Τυλίγει τις γραμμές ενός εικονιδίου (το "icon" κάθε module) σε <svg>
+export function icon(paths) {
+  return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
+}
+
 // Προσωρινή οθόνη για modules που δεν έχουν φτιαχτεί ακόμα
 export function placeholder(el, text) {
   el.innerHTML = `
-    <div class="card placeholder">
-      <p class="muted">${escapeHtml(text)}</p>
-      <p class="muted small">Έρχεται σε επόμενο βήμα.</p>
+    <div class="placeholder">
+      <p>${escapeHtml(text)}</p>
+      <p class="muted">Coming in a later step.</p>
     </div>`;
 }
 
-function renderHome(el) {
-  const today = new Date().toLocaleDateString('el-GR', {
-    weekday: 'long', day: 'numeric', month: 'long',
-  });
+// Αριθμός εβδομάδας κατά ISO (Δευτέρα = αρχή εβδομάδας)
+function isoWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
+}
 
-  const cards = allModules().map((m) => {
+function renderHome(el) {
+  const now = new Date();
+  const date = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+  const mods = allModules();
+
+  // Ένα module μπορεί να "πάρει" την κορυφή της Αρχικής (το πορτοφόλι)
+  const heroMod = mods.find((m) => m.renderHomeHero);
+  const listMods = mods.filter((m) => m !== heroMod);
+
+  const rows = listMods.map((m) => {
     let info = {};
     try { info = m.homeCard ? m.homeCard() || {} : {}; } catch (err) { console.error(m.id, err); }
     return `
-      <button class="home-card" data-go="${escapeHtml(m.id)}">
-        <span class="home-card-icon">${m.icon}</span>
-        <span class="home-card-title">${escapeHtml(m.title)}</span>
-        <span class="home-card-value">${escapeHtml(info.value ?? '—')}</span>
-        <span class="home-card-label">${escapeHtml(info.label ?? '')}</span>
-      </button>`;
+      <li>
+        <button class="row" data-go="${escapeHtml(m.id)}">
+          ${icon(m.icon)}
+          <span class="row-text">
+            <span class="row-title">${escapeHtml(m.title)}</span>
+            <span class="row-sub">${escapeHtml(info.label ?? '')}</span>
+          </span>
+          <span class="row-value">${escapeHtml(info.value ?? '')}</span>
+          <span class="row-chevron" aria-hidden="true">›</span>
+        </button>
+      </li>`;
   }).join('');
 
   el.innerHTML = `
-    <p class="muted date-line">${escapeHtml(today)}</p>
-    <div class="home-grid">${cards}</div>`;
+    <p class="subhead">${escapeHtml(date)}, week ${isoWeek(now)}</p>
+    <section class="hero" id="home-hero"></section>
+    <h2 class="section-title">Overview</h2>
+    <ul class="list">${rows}</ul>`;
+
+  if (heroMod) {
+    try { heroMod.renderHomeHero(el.querySelector('#home-hero')); } catch (err) { console.error(err); }
+  }
 
   el.querySelectorAll('[data-go]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.go));
@@ -54,12 +85,13 @@ function renderHome(el) {
 }
 
 function renderTabbar(activeId) {
-  const tabs = [{ id: 'home', title: 'Αρχική', icon: '🏠' }, ...allModules().filter((m) => m.nav)];
+  const tabs = [{ id: 'home', title: 'Today', icon: HOME_ICON }, ...allModules().filter((m) => m.nav)];
   const bar = document.getElementById('tabbar');
   bar.innerHTML = tabs.map((t) => `
-    <a href="#/${t.id}" class="tab ${t.id === activeId ? 'active' : ''}">
-      <span class="tab-icon">${t.icon}</span>
-      <span class="tab-label">${escapeHtml(t.title)}</span>
+    <a href="#/${t.id}" class="tab ${t.id === activeId ? 'active' : ''}"
+       ${t.id === activeId ? 'aria-current="page"' : ''}>
+      ${icon(t.icon)}
+      <span>${escapeHtml(t.title)}</span>
     </a>`).join('');
 }
 
@@ -78,13 +110,15 @@ function route() {
 
   const el = view();
   el.innerHTML = '';
-  document.getElementById('page-title').textContent = mod ? mod.title : 'Αρχική';
-  document.title = mod ? `${mod.title} · Πειθαρχία` : 'Πειθαρχία';
+  // Στην Αρχική ο τίτλος είναι η μέρα της εβδομάδας
+  const heading = mod ? mod.title : new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+  document.getElementById('page-title').textContent = heading;
+  document.title = mod ? `${mod.title} – Discipline` : 'Discipline';
 
   if (mod) {
     try { mod.render(el); } catch (err) {
       console.error(err);
-      el.innerHTML = '<div class="card"><p>Κάτι πήγε στραβά σε αυτή την οθόνη.</p></div>';
+      el.innerHTML = '<div class="placeholder"><p>This screen failed to load. Go back to Today and try again.</p></div>';
     }
   } else {
     renderHome(el);

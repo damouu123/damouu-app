@@ -3,12 +3,13 @@
 // Κάθε module καλεί register({...}) με τα στοιχεία του:
 //   id        μοναδικό όνομα, γίνεται και η διεύθυνση (#/calendar)
 //   title     τίτλος οθόνης
-//   icon      emoji για μενού και κάρτες
+//   icon      οι γραμμές ενός SVG εικονιδίου 24x24 (π.χ. '<path d="..."/>')
 //   order     σειρά εμφάνισης (μικρότερο = πρώτο)
 //   nav       true: εμφανίζεται στην κάτω μπάρα
 //   render(el)   ζωγραφίζει την οθόνη του μέσα στο στοιχείο el
 //   unmount()    (προαιρετικό) καθαρισμός όταν φεύγουμε από την οθόνη
-//   homeCard()   (προαιρετικό) σύνοψη για την Αρχική: { value, label }
+//   homeCard()   (προαιρετικό) γραμμή στη λίστα της Αρχικής: { value, label }
+//   renderHomeHero(el) (προαιρετικό) πιάνει την κορυφή της Αρχικής αντί για γραμμή
 //
 // Έτσι η Αρχική και η μπάρα δεν ξέρουν τίποτα για τα modules από πριν.
 // Για νέο module φτιάχνεις ένα αρχείο και το κάνεις import, τίποτα άλλο.
@@ -20,7 +21,7 @@ export function register(mod) {
     throw new Error('Το module χρειάζεται id και render()');
   }
   if (modules.has(mod.id)) throw new Error(`Διπλό module: ${mod.id}`);
-  modules.set(mod.id, { order: 100, nav: false, icon: '•', ...mod });
+  modules.set(mod.id, { order: 100, nav: false, icon: '<circle cx="12" cy="12" r="3"/>', ...mod });
 }
 
 export function getModule(id) {
