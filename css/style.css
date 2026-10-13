@@ -13,6 +13,11 @@
   --ink: #8fb0dc;         /* μπλε μελανιού: πανεπιστήμιο, XP */
   --danger: #e2775c;
 
+  /* Καταστάσεις παρουσίας */
+  --went: var(--ink);
+  --left: #cbb07a;        /* σιτάρι: μισή επιτυχία */
+  --missed: var(--danger);
+
   /* Γραμματοσειρές του iPhone: New York (serif) και SF (sans). Στα Windows πέφτει σε Georgia/Segoe. */
   --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
   --sans: system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
@@ -182,13 +187,268 @@ main { padding: 0 20px 32px; }
 .row .icon { color: var(--ink); }
 .row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .row-title { font-weight: 550; }
-.row-sub { font-size: 14px; color: var(--muted); }
+.row-sub {
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-time {
+  flex: none;
+  width: 48px;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .row-value {
   font-family: var(--serif);
   font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
 .row-chevron { color: var(--line); font-size: 22px; line-height: 1; }
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--line);
+}
+.stack { display: grid; gap: 12px; margin-top: 28px; }
+
+.link-btn {
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.back-link {
+  margin: 0 0 4px -4px;
+  padding: 8px 4px;
+  border: none;
+  background: none;
+  color: var(--lamp);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ===== Schedule: πλοήγηση εβδομάδας ===== */
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.icon-btn {
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: none;
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+}
+.week-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.week-label strong { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+.week-label span { font-size: 14px; color: var(--muted); }
+
+/* Λωρίδα ημερών */
+.day-strip {
+  display: flex;
+  gap: 6px;
+  margin-top: 16px;
+}
+.day {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 64px;
+  padding: 8px 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.day strong {
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.day.today strong { color: var(--lamp); }
+.day.selected { background: var(--surface); border-color: var(--line); }
+.day .dot {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+/* ===== Schedule: μαθήματα και κενά ===== */
+.day-list { display: grid; gap: 10px; margin-bottom: 24px; }
+
+.class {
+  display: flex;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--r-lg);
+  border-left: 4px solid var(--line);
+}
+.class.is-attended { border-left-color: var(--went); }
+.class.is-left { border-left-color: var(--left); }
+.class.is-missed { border-left-color: var(--missed); }
+.class.is-cancelled { border-left-color: transparent; background: none; outline: 1px dashed var(--line); }
+.class.is-cancelled h3 { text-decoration: line-through; color: var(--muted); }
+
+.class-time {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: 48px;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.class-time span:first-child { font-family: var(--serif); font-size: 20px; }
+.class-time span:last-child { color: var(--muted); }
+.class-body { flex: 1; min-width: 0; }
+.class-body h3 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.3; }
+.class-meta { margin: 2px 0 12px; font-size: 14px; color: var(--muted); }
+
+/* Τα 4 κουμπιά κατάστασης */
+.choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.choice {
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 550;
+  cursor: pointer;
+}
+.choice.is-attended { border-color: var(--went); color: var(--went); }
+.choice.is-left { border-color: var(--left); color: var(--left); }
+.choice.is-missed { border-color: var(--missed); color: var(--missed); }
+.choice.is-cancelled { color: var(--muted); }
+.choice.selected { color: var(--bg); }
+.choice.is-attended.selected { background: var(--went); }
+.choice.is-left.selected { background: var(--left); }
+.choice.is-missed.selected { background: var(--missed); }
+.choice.is-cancelled.selected { background: var(--muted); }
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  color: var(--bg);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.status-pill span { font-weight: 400; opacity: 0.7; }
+.status-pill.is-attended { background: var(--went); }
+.status-pill.is-left { background: var(--left); }
+.status-pill.is-missed { background: var(--missed); }
+.status-pill.is-cancelled { background: var(--surface-press); color: var(--muted); }
+
+.upcoming {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+  font-size: 15px;
+}
+
+.gap {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px 10px 82px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.gap.is-unexpected { color: var(--lamp); }
+
+/* ===== Φόρμες ===== */
+.form { display: grid; gap: 18px; }
+.field { display: grid; gap: 6px; margin: 0; padding: 0; border: none; min-width: 0; }
+.field > span, .field legend { font-size: 15px; color: var(--muted); padding: 0; }
+.field input, .field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  /* 17px: κάτω από 16px το iPhone κάνει zoom όταν πατάς το πεδίο */
+  font: inherit;
+  font-size: 17px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.field input:focus, .field select:focus { outline: 2px solid var(--lamp); outline-offset: 0; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.segmented { display: flex; gap: 6px; padding: 4px; background: var(--surface); border-radius: 14px; }
+.segmented label { flex: 1; }
+.segmented input { position: absolute; opacity: 0; pointer-events: none; }
+.segmented span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.segmented input:checked + span { background: var(--surface-press); color: var(--lamp); font-weight: 600; }
+.segmented input:focus-visible + span { outline: 2px solid var(--lamp); }
+
+.form-error { margin: 0; color: var(--danger); }
+.form-error[hidden] { display: none; }
 
 /* ===== Οθόνη που δεν έχει φτιαχτεί ακόμα ===== */
 .placeholder {

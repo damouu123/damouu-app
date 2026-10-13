@@ -4,7 +4,7 @@
 //
 // ΣΗΜΑΝΤΙΚΟ: Κάθε φορά που αλλάζεις οποιοδήποτε αρχείο, ανέβασε το VERSION.
 // Έτσι το iPhone καταλαβαίνει ότι υπάρχει νέα έκδοση.
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CACHE = `discipline-${VERSION}`;
 
 // Όλα τα αρχεία του app (σχετικά paths, για να δουλεύει σε GitHub Pages υποφάκελο)
@@ -22,6 +22,7 @@ const ASSETS = [
   './js/modules/timer.js',
   './js/modules/wallet.js',
   './js/modules/notifications.js',
+  './data/schedule.js',
   './icons/icon-180.png',
   './icons/icon-192.png',
   './icons/icon-512.png',

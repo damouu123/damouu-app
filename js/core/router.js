@@ -10,8 +10,15 @@ let current = null; // το module που φαίνεται τώρα
 
 const HOME_ICON = '<path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z"/>';
 
-export function navigate(id) {
-  location.hash = `#/${id}`;
+// path: 'timer' ή με υπο-διεύθυνση, π.χ. 'calendar/edit'
+export function navigate(path) {
+  location.hash = `#/${path}`;
+}
+
+// Ένα module αλλάζει τον τίτλο της οθόνης του (π.χ. "Edit schedule")
+export function setTitle(text) {
+  document.getElementById('page-title').textContent = text;
+  document.title = `${text} – Discipline`;
 }
 
 export function escapeHtml(str) {
@@ -96,27 +103,35 @@ function renderTabbar(activeId) {
 }
 
 function route() {
-  const id = location.hash.replace(/^#\/?/, '') || 'home';
+  // "#/calendar/edit/abc" -> id "calendar", params ["edit", "abc"]
+  const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
+  const id = parts[0] || 'home';
+  const params = parts.slice(1);
   const mod = id === 'home' ? null : getModule(id);
 
   // Αν η διεύθυνση δεν αντιστοιχεί σε module, πάμε στην Αρχική
   if (id !== 'home' && !mod) { navigate('home'); return; }
 
-  // Δίνουμε στο προηγούμενο module την ευκαιρία να καθαρίσει (π.χ. timers)
-  if (current && current.unmount) {
+  // Όταν φεύγουμε από ένα module (όχι απλώς αλλάζουμε υπο-οθόνη του),
+  // του δίνουμε την ευκαιρία να καθαρίσει (π.χ. timers)
+  if (current && current !== mod && current.unmount) {
     try { current.unmount(); } catch (err) { console.error(err); }
   }
   current = mod;
 
   const el = view();
   el.innerHTML = '';
+  el.onclick = null; // καθαρίζουμε click handlers της προηγούμενης οθόνης
   // Στην Αρχική ο τίτλος είναι η μέρα της εβδομάδας
-  const heading = mod ? mod.title : new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-  document.getElementById('page-title').textContent = heading;
-  document.title = mod ? `${mod.title} – Discipline` : 'Discipline';
+  if (mod) {
+    setTitle(mod.title);
+  } else {
+    document.getElementById('page-title').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+    document.title = 'Discipline';
+  }
 
   if (mod) {
-    try { mod.render(el); } catch (err) {
+    try { mod.render(el, params); } catch (err) {
       console.error(err);
       el.innerHTML = '<div class="placeholder"><p>This screen failed to load. Go back to Today and try again.</p></div>';
     }
