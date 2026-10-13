@@ -63,6 +63,11 @@ function streaks(records) {
   return { current, best };
 }
 
+// Το streak όπως ήταν στο τέλος μιας ημέρας (π.χ. Κυριακή μιας παλιάς εβδομάδας)
+export function streakUntil(toKey) {
+  return streaks(countedRecords().filter((r) => r.date <= toKey)).current;
+}
+
 export function getXp() {
   const records = countedRecords();
   const total = records.reduce((sum, r) => sum + pointsFor(r.status), 0);

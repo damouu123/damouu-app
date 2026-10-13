@@ -222,7 +222,9 @@ function defaultDay() {
   return today;
 }
 
-function weekHeading(days) {
+// Τίτλος εβδομάδας: { range: "12–16 October", rel: "This week" }
+// days: οι μέρες που δείχνουμε (αρκεί η πρώτη και η τελευταία)
+export function weekHeading(days) {
   const month = (d) => d.toLocaleDateString('en-GB', { month: 'long' });
   const a = days[0];
   const b = days[days.length - 1];

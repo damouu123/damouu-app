@@ -488,6 +488,22 @@ main { padding: 0 20px 32px; }
 }
 .xp-plus { color: var(--ink); }
 
+/* ===== Weekly review ===== */
+.review-hero { margin-top: 20px; }
+.hero-number.ink { color: var(--ink); }
+.is-low { color: var(--missed); }
+.icon-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* Ειδοποίηση μέσα στη σελίδα (π.χ. "2 classes aren't marked") */
+.notice {
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--r-lg);
+}
+.notice p { margin: 0 0 12px; }
+
 /* ===== Toast: σύντομο μήνυμα που σβήνει μόνο του ===== */
 .toast {
   position: fixed;
