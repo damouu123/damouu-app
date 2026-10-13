@@ -32,6 +32,23 @@ export function icon(paths) {
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 }
 
+// Σύντομο μήνυμα κάτω από την οθόνη που σβήνει μόνο του (π.χ. "+10 XP")
+let toastTimer = null;
+export function toast(text) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
 // Προσωρινή οθόνη για modules που δεν έχουν φτιαχτεί ακόμα
 export function placeholder(el, text) {
   el.innerHTML = `

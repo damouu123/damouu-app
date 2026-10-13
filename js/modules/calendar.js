@@ -2,7 +2,7 @@
 //
 // Δεδομένα (στο localStorage, μέσω moduleStore('calendar')):
 //   schedule    η λίστα μαθημάτων (αν λείπει, παίρνουμε το seed από data/schedule.js)
-//   attendance  { "2026-10-13|db-tut-tue": { status, title, type, date, at } }
+//   attendance  { "2026-10-13|db-tut-tue": { status, title, type, date, start, at } }
 //               ένα κλειδί ανά μάθημα ανά ημερομηνία. Κρατάμε και τίτλο/τύπο,
 //               ώστε το ιστορικό να μη χάνεται αν σβήσεις ένα μάθημα αργότερα.
 //
@@ -124,7 +124,9 @@ export function entriesForDate(date) {
 export function setStatus(entry, status) {
   store.update('attendance', (att) => {
     if (status) {
-      att[entry.key] = { status, title: entry.title, type: entry.type, date: entry.date, at: Date.now() };
+      att[entry.key] = {
+        status, title: entry.title, type: entry.type, date: entry.date, start: entry.start, at: Date.now(),
+      };
     } else {
       delete att[entry.key];
     }
