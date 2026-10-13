@@ -1,0 +1,178 @@
+/* ===== Χρώματα και μεγέθη (αλλάζεις εδώ, αλλάζει παντού) ===== */
+:root {
+  --bg: #0f1115;
+  --surface: #181b22;
+  --surface-2: #222632;
+  --border: #2c3140;
+  --text: #eef0f4;
+  --muted: #9aa1b2;
+  --accent: #4ade80;      /* πράσινο: επιτυχία, κέρδος λεπτών */
+  --accent-ink: #06240f;
+  --warn: #fbbf24;
+  --danger: #f87171;
+  --radius: 16px;
+  --tabbar-h: 64px;
+  /* Περιθώρια ασφαλείας για notch και home indicator του iPhone */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  font-size: 17px;
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  min-height: 100dvh;
+  padding-top: var(--safe-top);
+  padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
+}
+
+/* Κουμπιά και links: χωρίς zoom στο διπλό πάτημα, χωρίς μενού στο παρατεταμένο */
+button, a, .tab {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ===== Πάνω μπάρα ===== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  background: var(--bg);
+}
+.topbar h1 { margin: 0; font-size: 28px; font-weight: 700; }
+
+.badge {
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--warn);
+}
+
+/* ===== Περιεχόμενο ===== */
+main { padding: 4px 16px 24px; }
+
+.muted { color: var(--muted); }
+.small { font-size: 14px; }
+.date-line { margin: 0 0 14px; text-transform: capitalize; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 12px;
+}
+.placeholder { text-align: center; padding: 32px 18px; }
+
+/* ===== Κουμπιά (μεγάλα, εύκολα στο δάχτυλο) ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 20px;
+  border: none;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn:active { transform: scale(0.97); }
+.btn-small { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.btn-block { width: 100%; }
+
+/* ===== Αρχική: κάρτες modules ===== */
+.home-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-height: 132px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.home-card:active { background: var(--surface-2); }
+.home-card-icon { font-size: 26px; }
+.home-card-title { font-weight: 600; }
+.home-card-value { font-size: 24px; font-weight: 700; color: var(--accent); margin-top: auto; }
+.home-card-label { font-size: 13px; color: var(--muted); }
+
+/* ===== Κάτω μπάρα πλοήγησης ===== */
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  height: calc(var(--tabbar-h) + var(--safe-bottom));
+  padding-bottom: var(--safe-bottom);
+  background: rgba(15, 17, 21, 0.92);
+  border-top: 1px solid var(--border);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 12px;
+}
+.tab-icon { font-size: 22px; line-height: 1; filter: grayscale(1); opacity: 0.7; }
+.tab.active { color: var(--accent); }
+.tab.active .tab-icon { filter: none; opacity: 1; }
+
+/* ===== Μήνυμα νέας έκδοσης ===== */
+.update-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 12px);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.update-banner[hidden], .badge[hidden] { display: none; }
