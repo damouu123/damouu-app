@@ -7,6 +7,13 @@
 // υπολογίζουμε: υπόλοιπο = endsAt - τώρα. Αν το app ξανανοίξει μετά το
 // endsAt, η συνεδρία ολοκληρώνεται εκείνη τη στιγμή.
 //
+// ΚΑΝΟΝΕΣ
+// - Ολοκληρώνεις: κερδίζεις λεπτά scroll.
+// - Σταματάς με παρατεταμένο πάτημα 10" + επιβεβαίωση: 0 λεπτά.
+// - Κλείδωμα κινητού / έξοδος από το app: επιτρέπεται, ο χρόνος συνεχίζει.
+//   (Το iOS δεν λέει στο app αν κλείδωσες ή άνοιξες άλλη εφαρμογή, οπότε
+//   τις άλλες εφαρμογές τις μπλοκάρει το Focus/Screen Time του iPhone.)
+//
 // Δεδομένα (moduleStore('timer')):
 //   active    η συνεδρία που τρέχει τώρα (ή null)
 //   sessions  ιστορικό: [{ id, activity, minutes, startedAt, endedAt, awayMs, completed, earned }]
@@ -28,7 +35,7 @@ export const ACTIVITIES = {
 export const EARN_RATE = 0.5;
 export const earnedFor = (minutes) => Math.round(minutes * EARN_RATE);
 
-const HOLD_MS = 10000;          // πόση ώρα κρατάς πατημένο για να σταματήσεις
+const HOLD_MS = 10000; // πόση ώρα κρατάς πατημένο για να σταματήσεις
 const MIN_MIN = 5;
 const MAX_MIN = 180;
 // Στον υπολογιστή (localhost) δείχνουμε και επιλογή 1 λεπτού για δοκιμές
@@ -51,15 +58,14 @@ function start(activity, minutes) {
     minutes,
     startedAt: now,
     endsAt: now + minutes * 60000,
-    awayMs: 0,      // πόση ώρα ήσουν εκτός app
-    hiddenAt: null, // πότε βγήκες από το app (αν είσαι έξω τώρα)
+    awayMs: 0,      // πόση ώρα ήσουν εκτός app ή με κλειδωμένο κινητό (μόνο για στατιστικά)
+    hiddenAt: null, // πότε βγήκες (αν είσαι έξω τώρα)
   });
   store.set('last', { activity, minutes });
-  unlockAudio();
   showOverlay();
 }
 
-// Προσθέτει στο awayMs τον χρόνο από τότε που βγήκες από το app
+// Προσθέτει στο awayMs τον χρόνο από τότε που βγήκες (έως το τέλος της συνεδρίας)
 function closeAway(a) {
   if (a.hiddenAt) {
     a.awayMs += Math.max(0, Math.min(Date.now(), a.endsAt) - a.hiddenAt);
@@ -89,52 +95,44 @@ function finish(completed) {
 }
 
 // ===================== Ήχος στο τέλος =====================
-// Το iOS επιτρέπει ήχο μόνο αν "ξεκλειδωθεί" από πάτημα, γι' αυτό
-// φτιάχνουμε το AudioContext όταν πατάς Start.
+// Οι browsers παίζουν ήχο μόνο αφού αγγίξεις τη σελίδα. Γι' αυτό
+// "ξεκλειδώνουμε" τον ήχο σε ΚΑΘΕ άγγιγμα (όχι μόνο στο Start), ώστε
+// να δουλεύει και μετά από ανανέωση της σελίδας.
+// Δεν ακούγεται αν το κινητό είναι κλειδωμένο / το app κρυμμένο τη στιγμή
+// που τελειώνει ο χρόνος, ή αν είναι ενεργός ο διακόπτης σίγασης.
 let audio = null;
 function unlockAudio() {
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    audio.resume();
+    if (audio.state !== 'running') audio.resume();
   } catch { audio = null; }
 }
-function chime() {
+document.addEventListener('pointerdown', unlockAudio, { capture: true });
+document.addEventListener('keydown', unlockAudio, { capture: true });
+
+async function chime() {
   if (!audio) return;
   try {
+    if (audio.state !== 'running') await audio.resume();
+    const t = audio.currentTime + 0.05;
     [0, 0.25].forEach((delay, i) => {
       const osc = audio.createOscillator();
       const gain = audio.createGain();
       osc.frequency.value = i ? 880 : 660;
-      gain.gain.setValueAtTime(0.0001, audio.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.3, audio.currentTime + delay + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + delay + 0.5);
+      gain.gain.setValueAtTime(0.0001, t + delay);
+      gain.gain.exponentialRampToValueAtTime(0.3, t + delay + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 0.5);
       osc.connect(gain).connect(audio.destination);
-      osc.start(audio.currentTime + delay);
-      osc.stop(audio.currentTime + delay + 0.55);
+      osc.start(t + delay);
+      osc.stop(t + delay + 0.55);
     });
   } catch { /* χωρίς ήχο */ }
-}
-
-// ===================== Οθόνη να μένει αναμμένη =====================
-// Wake Lock: όσο τρέχει το timer, η οθόνη δεν σβήνει μόνη της
-// (όπου υποστηρίζεται· αλλιώς απλώς αγνοείται).
-let wakeLock = null;
-async function keepScreenOn() {
-  try {
-    if ('wakeLock' in navigator && !wakeLock) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => { wakeLock = null; });
-    }
-  } catch { wakeLock = null; }
-}
-function letScreenSleep() {
-  try { if (wakeLock) wakeLock.release(); } catch { /* τίποτα */ }
-  wakeLock = null;
 }
 
 // ===================== Κλειδωμένη οθόνη (overlay) =====================
 // Ένα στοιχείο που καλύπτει ΟΛΟ το app, μαζί και την κάτω μπάρα.
 // Δεν ανήκει σε καμία οθόνη του router, άρα μένει ό,τι κι αν γίνει.
+// overlay.dataset.view: 'running' | 'confirm' | 'result'
 
 let overlay = null;
 let ticker = null;
@@ -150,18 +148,20 @@ const fmt = (ms) => {
 
 const clock = (ts) => new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
+function ensureOverlay() {
+  if (overlay) return;
+  overlay = document.createElement('div');
+  overlay.className = 'focus-screen';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'Focus session');
+  document.body.appendChild(overlay);
+  document.body.classList.add('locked');
+}
+
 function showOverlay() {
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.className = 'focus-screen';
-    overlay.setAttribute('role', 'dialog');
-    overlay.setAttribute('aria-modal', 'true');
-    overlay.setAttribute('aria-label', 'Focus session');
-    document.body.appendChild(overlay);
-    document.body.classList.add('locked');
-  }
+  ensureOverlay();
   renderRunning();
-  keepScreenOn();
   clearInterval(ticker);
   ticker = setInterval(tick, 250);
   tick();
@@ -170,7 +170,6 @@ function showOverlay() {
 function hideOverlay() {
   clearInterval(ticker);
   ticker = null;
-  letScreenSleep();
   if (overlay) overlay.remove();
   overlay = null;
   document.body.classList.remove('locked');
@@ -179,13 +178,14 @@ function hideOverlay() {
 function renderRunning() {
   const a = getActive();
   if (!a || !overlay) return;
+  overlay.dataset.view = 'running';
   overlay.innerHTML = `
     <div class="focus-inner">
       <p class="focus-activity">${icon(ACTIVITIES[a.activity].icon)} ${ACTIVITIES[a.activity].label}</p>
       <p class="focus-time" aria-live="off">${fmt(a.endsAt - Date.now())}</p>
       <div class="progress focus-progress"><span></span></div>
       <p class="muted">Ends at ${clock(a.endsAt)}. You'll earn ${earnedFor(a.minutes)} min of scroll time.</p>
-      <p class="focus-away muted" hidden></p>
+      <p class="muted">You can lock your phone. The timer keeps going.</p>
     </div>
     <button class="hold-btn" type="button">
       <span class="hold-fill" aria-hidden="true"></span>
@@ -197,7 +197,7 @@ function renderRunning() {
 // Ενημερώνει την ώρα· αν τελείωσε ο χρόνος, ολοκληρώνει τη συνεδρία
 function tick() {
   const a = getActive();
-  if (!a) return;
+  if (!a || !overlay) return;
   const now = Date.now();
   if (now >= a.endsAt) {
     const session = finish(true);
@@ -205,19 +205,14 @@ function tick() {
     renderResult(session);
     return;
   }
-  if (!overlay) return;
-  const time = overlay.querySelector('.focus-time');
-  if (time) time.textContent = fmt(a.endsAt - now);
-  const bar = overlay.querySelector('.focus-progress span');
-  if (bar) bar.style.width = `${((now - a.startedAt) / (a.endsAt - a.startedAt)) * 100}%`;
-  const away = overlay.querySelector('.focus-away');
-  if (away && a.awayMs >= 60000) {
-    away.hidden = false;
-    away.textContent = `Time outside the app so far: ${Math.round(a.awayMs / 60000)} min`;
-  }
+  if (overlay.dataset.view !== 'running') return;
+  overlay.querySelector('.focus-time').textContent = fmt(a.endsAt - now);
+  const total = a.minutes * 60000;
+  overlay.querySelector('.focus-progress span').style.width = `${(1 - (a.endsAt - now) / total) * 100}%`;
 }
 
-// Παρατεταμένο πάτημα: γεμίζει μια μπάρα για HOLD_MS. Αν αφήσεις νωρίτερα, μηδενίζει.
+// Παρατεταμένο πάτημα: η μπάρα γεμίζει (εικόνα) και ένα setTimeout
+// αποφασίζει το τέλος. Αν αφήσεις νωρίτερα, μηδενίζει.
 function bindHold(btn, onDone) {
   const fill = btn.querySelector('.hold-fill');
   const label = btn.querySelector('.hold-label');
@@ -258,6 +253,7 @@ function bindHold(btn, onDone) {
 function renderConfirm() {
   const a = getActive();
   if (!a || !overlay) return;
+  overlay.dataset.view = 'confirm';
   const left = Math.ceil((a.endsAt - Date.now()) / 60000);
   overlay.innerHTML = `
     <div class="focus-inner confirm">
@@ -281,16 +277,14 @@ function renderConfirm() {
 function renderResult(session) {
   clearInterval(ticker);
   ticker = null;
-  letScreenSleep();
-  if (!overlay) showOverlayShell();
-  const away = Math.round(session.awayMs / 60000);
+  ensureOverlay();
+  overlay.dataset.view = 'result';
   overlay.innerHTML = `
     <div class="focus-inner">
       <p class="hero-label">Session complete</p>
       <p class="hero-number"><strong>+${session.earned}</strong><span>min</span></p>
       <p>${session.minutes} minutes of ${ACTIVITIES[session.activity].label.toLowerCase()}.
         Scroll time earned.</p>
-      ${away ? `<p class="muted">You spent ${away} min of it outside the app.</p>` : ''}
       <div class="stack"><button class="btn btn-block" data-done>Done</button></div>
     </div>`;
   overlay.querySelector('[data-done]').addEventListener('click', () => {
@@ -301,31 +295,20 @@ function renderResult(session) {
   });
 }
 
-// Overlay χωρίς ticker (για αποτέλεσμα που βρέθηκε μόλις άνοιξε το app)
-function showOverlayShell() {
-  overlay = document.createElement('div');
-  overlay.className = 'focus-screen';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  document.body.appendChild(overlay);
-  document.body.classList.add('locked');
-}
-
 // ===================== Όταν βγαίνεις/μπαίνεις στο app =====================
+// Καταγράφουμε μόνο πόση ώρα έλειπες (χωρίς τιμωρία) και, όταν γυρίσεις,
+// ελέγχουμε αμέσως αν τελείωσε ο χρόνος.
 
 document.addEventListener('visibilitychange', () => {
   const a = getActive();
   if (!a) return;
   if (document.hidden) {
     a.hiddenAt = Date.now();
-    saveActive(a);
-    letScreenSleep();
   } else {
     closeAway(a);
-    saveActive(a);
-    keepScreenOn();
-    tick();
   }
+  saveActive(a);
+  if (!document.hidden) tick();
 });
 
 // ===================== Οθόνη επιλογής =====================
@@ -367,8 +350,8 @@ function render(el) {
 
     <button class="btn btn-block" data-start>Start focusing</button>
     <p class="muted small-print">
-      The screen locks until the time is up. To stop early, hold the stop button for 10 seconds.
-      Locking your phone is fine: the timer keeps going.
+      The screen locks until the time is up. To stop early, hold the stop button for 10 seconds
+      and you earn nothing. Locking your phone is fine: the timer keeps going.
     </p>
 
     ${today.length ? `

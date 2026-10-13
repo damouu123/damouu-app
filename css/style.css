@@ -598,7 +598,6 @@ body.locked { overflow: hidden; }
 }
 .focus-progress span { background: var(--lamp); transition: none; }
 .focus-inner .muted { margin: 14px 0 0; font-size: 15px; }
-.focus-away[hidden] { display: none; }
 
 /* Κουμπί παρατεταμένου πατήματος */
 .hold-btn {
