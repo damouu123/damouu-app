@@ -8,7 +8,7 @@
 import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { navigate, escapeHtml, toast } from '../core/router.js';
-import { getAttendance, getSchedule, STATUSES, parseKey } from './calendar.js';
+import { validAttendance, STATUSES, parseKey } from './calendar.js';
 
 const store = moduleStore('xp');
 
@@ -35,16 +35,11 @@ export function levelFor(total) {
 
 // ===================== Υπολογισμός =====================
 
-// Όλες οι παρουσίες που μετράνε (χωρίς cancelled), με χρονολογική σειρά
+// Όλες οι παρουσίες που μετράνε (του τωρινού προγράμματος, χωρίς cancelled),
+// με χρονολογική σειρά
 export function countedRecords() {
-  const startById = Object.fromEntries(getSchedule().map((e) => [e.id, e.start]));
-  return Object.entries(getAttendance())
-    .filter(([, r]) => r.status !== 'cancelled')
-    .map(([key, r]) => {
-      const id = key.split('|')[1];
-      // Παλιές εγγραφές χωρίς start: παίρνουμε την ώρα από το πρόγραμμα
-      return { key, ...r, start: r.start || startById[id] || '00:00' };
-    })
+  return validAttendance()
+    .filter((r) => r.status !== 'cancelled')
     .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
 }
 
@@ -86,13 +81,15 @@ export function getXp() {
 
 // ===================== Ανταπόκριση σε αλλαγές παρουσίας =====================
 
-// Την πρώτη φορά κρατάμε το τωρινό σύνολο, για να μη δείξουμε π.χ. "+80 XP"
-// για παρουσίες που είχες σημειώσει πριν υπάρξει το XP.
-if (store.get('lastTotal', null) === null) {
+// Κρατάμε σιωπηλά το τωρινό σύνολο όταν ανοίγει το app και όταν αλλάζει
+// το πρόγραμμα. Έτσι το "+10 XP" δείχνει μόνο ό,τι κέρδισες μόλις τώρα.
+function syncSilently() {
   const { total, level } = getXp();
   store.set('lastTotal', total);
   store.set('lastLevel', level);
 }
+syncSilently();
+on('schedule:changed', syncSilently);
 
 // Κάθε φορά που σημειώνεις παρουσία, συγκρίνουμε με το προηγούμενο σύνολο
 on('attendance:changed', () => {

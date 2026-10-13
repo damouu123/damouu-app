@@ -3,8 +3,8 @@
 // Δεδομένα (στο localStorage, μέσω moduleStore('calendar')):
 //   schedule    η λίστα μαθημάτων (αν λείπει, παίρνουμε το seed από data/schedule.js)
 //   attendance  { "2026-10-13|db-tut-tue": { status, title, type, date, start, at } }
-//               ένα κλειδί ανά μάθημα ανά ημερομηνία. Κρατάμε και τίτλο/τύπο,
-//               ώστε το ιστορικό να μη χάνεται αν σβήσεις ένα μάθημα αργότερα.
+//               ένα κλειδί ανά μάθημα ανά ημερομηνία. Μετράνε μόνο όσα
+//               ταιριάζουν με το τωρινό πρόγραμμα (δες validAttendance).
 //
 // Τα export functions παρακάτω τα χρησιμοποιούν και άλλα modules (XP, εβδομάδα,
 // ειδοποιήσεις), ώστε να μη χρειάζεται να ξέρουν πώς αποθηκεύονται τα δεδομένα.
@@ -100,6 +100,26 @@ function saveSchedule(list) {
 
 export function getAttendance() {
   return store.get('attendance', {});
+}
+
+// Μόνο οι παρουσίες που ταιριάζουν με το ΤΩΡΙΝΟ πρόγραμμα: το μάθημα
+// υπάρχει ακόμα και γίνεται εκείνη τη μέρα της εβδομάδας. Αυτές μετράνε
+// σε XP και στατιστικά. Οι υπόλοιπες (π.χ. από μάθημα που σβήστηκε ή
+// μπήκε λάθος μέρα) δεν σβήνονται, απλώς αγνοούνται. Αν το μάθημα
+// ξαναμπεί στο πρόγραμμα, ξαναμετράνε.
+// Επιστρέφει λίστα: [{ key, id, status, title, type, date, start }]
+export function validAttendance() {
+  const byId = new Map(getSchedule().map((e) => [e.id, e]));
+  return Object.entries(getAttendance())
+    .map(([key, r]) => ({ key, id: key.split('|')[1], ...r }))
+    .filter((r) => {
+      const e = byId.get(r.id);
+      return e && e.day === weekday(parseKey(r.date));
+    })
+    .map((r) => {
+      const e = byId.get(r.id);
+      return { ...r, title: e.title, type: e.type, start: e.start };
+    });
 }
 
 // Τα μαθήματα μιας ημέρας, ταξινομημένα, μαζί με την κατάστασή τους
@@ -369,7 +389,7 @@ function renderEditList(el) {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.dataset.go) navigate(b.dataset.go);
-    if ('reset' in b.dataset && confirm('Replace your schedule with the original one? Attendance you already marked is kept.')) {
+    if ('reset' in b.dataset && confirm('Replace your schedule with the original one? Attendance for classes that are not in it will stop counting.')) {
       store.remove('schedule');
       emit('schedule:changed');
       renderEditList(el);
@@ -460,7 +480,7 @@ function renderForm(el, id) {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.dataset.go) navigate(b.dataset.go);
-    if ('delete' in b.dataset && confirm(`Delete ${e.title}? Attendance you already marked is kept.`)) {
+    if ('delete' in b.dataset && confirm(`Delete ${e.title}? Its past attendance will stop counting toward XP.`)) {
       saveSchedule(getSchedule().filter((x) => x.id !== id));
       navigate('calendar/edit');
     }
