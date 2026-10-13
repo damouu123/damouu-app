@@ -157,6 +157,7 @@ main { padding: 0 20px 32px; }
   font-variant-numeric: lining-nums tabular-nums;
 }
 .hero-number span { font-size: 26px; }
+.hero-number.is-negative { color: var(--danger); }
 .hero-hint { margin: 0 0 20px; color: var(--muted); font-size: 15px; max-width: 32ch; }
 
 /* ===== Λίστα σαν τις Ρυθμίσεις του iOS ===== */

@@ -9,14 +9,20 @@
 //
 // ΚΑΝΟΝΕΣ
 // - Ολοκληρώνεις: κερδίζεις λεπτά scroll.
-// - Σταματάς με παρατεταμένο πάτημα 10" + επιβεβαίωση: 0 λεπτά.
+// - Σταματάς νωρίς (παρατεταμένο πάτημα 10" + επιβεβαίωση): χάνεις τη
+//   συνεδρία ΚΑΙ 5 λεπτά από το πορτοφόλι.
+// - Emergency (2 την ημέρα): σταματάς χωρίς την ποινή των 5 λεπτών.
+//   Το app δεν μπορεί να ελέγξει αν ήταν όντως επείγον: είναι στον λόγο σου.
 // - Κλείδωμα κινητού / έξοδος από το app: επιτρέπεται, ο χρόνος συνεχίζει.
 //   (Το iOS δεν λέει στο app αν κλείδωσες ή άνοιξες άλλη εφαρμογή, οπότε
 //   τις άλλες εφαρμογές τις μπλοκάρει το Focus/Screen Time του iPhone.)
 //
 // Δεδομένα (moduleStore('timer')):
 //   active    η συνεδρία που τρέχει τώρα (ή null)
-//   sessions  ιστορικό: [{ id, activity, minutes, startedAt, endedAt, awayMs, completed, earned }]
+//   sessions  ιστορικό: [{ id, activity, minutes, startedAt, endedAt, awayMs,
+//                          completed, earned, penalty, reason }]
+//             reason: null (ολοκληρώθηκε) | 'stopped' | 'emergency'
+//   passes    { date: "2026-10-13", used: 1 } emergency passes της ημέρας
 //   last      τελευταία επιλογή δραστηριότητας/διάρκειας
 
 import { register, emit } from '../core/registry.js';
@@ -35,6 +41,8 @@ export const ACTIVITIES = {
 export const EARN_RATE = 0.5;
 export const earnedFor = (minutes) => Math.round(minutes * EARN_RATE);
 
+export const PENALTY_MIN = 5; // λεπτά που χάνεις από το πορτοφόλι αν σταματήσεις νωρίς
+const PASSES_PER_DAY = 2;
 const HOLD_MS = 10000; // πόση ώρα κρατάς πατημένο για να σταματήσεις
 const MIN_MIN = 5;
 const MAX_MIN = 180;
@@ -47,6 +55,17 @@ export function getSessions() {
 
 const getActive = () => store.get('active', null);
 const saveActive = (a) => store.set('active', a);
+
+const todayKey = () => new Date().toLocaleDateString('sv'); // "2026-10-13"
+
+function passesLeft() {
+  const p = store.get('passes', null);
+  return PASSES_PER_DAY - (p && p.date === todayKey() ? p.used : 0);
+}
+
+function usePass() {
+  store.set('passes', { date: todayKey(), used: PASSES_PER_DAY - passesLeft() + 1 });
+}
 
 // ===================== Κύκλος ζωής συνεδρίας =====================
 
@@ -73,11 +92,13 @@ function closeAway(a) {
   }
 }
 
-// completed: true = τελείωσε ο χρόνος, false = το σταμάτησες
-function finish(completed) {
+// reason: null = τελείωσε ο χρόνος, 'stopped' = σταμάτησες (ποινή),
+//         'emergency' = σταμάτησες με emergency pass (χωρίς ποινή)
+function finish(reason) {
   const a = getActive();
   if (!a) return null;
   closeAway(a);
+  const completed = reason === null;
   const session = {
     id: a.id,
     activity: a.activity,
@@ -87,6 +108,8 @@ function finish(completed) {
     awayMs: Math.round(a.awayMs),
     completed,
     earned: completed ? earnedFor(a.minutes) : 0,
+    penalty: reason === 'stopped' ? PENALTY_MIN : 0,
+    reason,
   };
   store.update('sessions', (list) => [...list, session], []);
   store.remove('active');
@@ -97,14 +120,23 @@ function finish(completed) {
 // ===================== Ήχος στο τέλος =====================
 // Οι browsers παίζουν ήχο μόνο αφού αγγίξεις τη σελίδα. Γι' αυτό
 // "ξεκλειδώνουμε" τον ήχο σε ΚΑΘΕ άγγιγμα (όχι μόνο στο Start), ώστε
-// να δουλεύει και μετά από ανανέωση της σελίδας.
-// Δεν ακούγεται αν το κινητό είναι κλειδωμένο / το app κρυμμένο τη στιγμή
-// που τελειώνει ο χρόνος, ή αν είναι ενεργός ο διακόπτης σίγασης.
+// να δουλεύει και μετά από ανανέωση της σελίδας. Το iPhone θέλει επιπλέον
+// να παίξει πραγματικά ένας ήχος μέσα στο άγγιγμα: παίζουμε έναν σιωπηλό.
+//
+// Αν ο χρόνος τελειώσει ενώ δεν βλέπεις το app, ο browser δεν αφήνει
+// ήχο εκείνη τη στιγμή. Τότε τον κρατάμε "σε αναμονή" (pendingChime)
+// και τον παίζουμε μόλις γυρίσεις.
+// Στο iPhone δεν ακούγεται αν είναι ενεργός ο διακόπτης σίγασης.
 let audio = null;
+let pendingChime = false;
 function unlockAudio() {
   try {
     audio = audio || new (window.AudioContext || window.webkitAudioContext)();
     if (audio.state !== 'running') audio.resume();
+    const silent = audio.createBufferSource();
+    silent.buffer = audio.createBuffer(1, 1, 22050);
+    silent.connect(audio.destination);
+    silent.start(0);
   } catch { audio = null; }
 }
 document.addEventListener('pointerdown', unlockAudio, { capture: true });
@@ -185,7 +217,8 @@ function renderRunning() {
       <p class="focus-time" aria-live="off">${fmt(a.endsAt - Date.now())}</p>
       <div class="progress focus-progress"><span></span></div>
       <p class="muted">Ends at ${clock(a.endsAt)}. You'll earn ${earnedFor(a.minutes)} min of scroll time.</p>
-      <p class="muted">You can lock your phone. The timer keeps going.</p>
+      <p class="muted">You can lock your phone, the timer keeps going.
+        Stopping early costs you ${PENALTY_MIN} min from your wallet.</p>
     </div>
     <button class="hold-btn" type="button">
       <span class="hold-fill" aria-hidden="true"></span>
@@ -200,8 +233,8 @@ function tick() {
   if (!a || !overlay) return;
   const now = Date.now();
   if (now >= a.endsAt) {
-    const session = finish(true);
-    if (!document.hidden) chime();
+    const session = finish(null);
+    if (document.hidden) pendingChime = true; else chime();
     renderResult(session);
     return;
   }
@@ -255,22 +288,38 @@ function renderConfirm() {
   if (!a || !overlay) return;
   overlay.dataset.view = 'confirm';
   const left = Math.ceil((a.endsAt - Date.now()) / 60000);
+  const passes = passesLeft();
   overlay.innerHTML = `
     <div class="focus-inner confirm">
       <h2>Do you really want to stop?</h2>
       <p class="muted">You have ${left} ${left === 1 ? 'minute' : 'minutes'} left.
-        If you stop now, you lose this session and earn no scroll time.</p>
+        If you stop now, you lose this session and ${PENALTY_MIN} min from your wallet.</p>
       <div class="stack">
         <button class="btn btn-block" data-keep>Keep focusing</button>
-        <button class="btn btn-danger btn-block" data-quit>Stop and earn nothing</button>
+        ${passes > 0 ? `
+          <button class="btn btn-quiet btn-block" data-emergency>It's an emergency</button>
+          <p class="muted small-print">Stops without the ${PENALTY_MIN} min penalty.
+            ${passes === 1 ? 'This is your last emergency pass today.' : `You have ${passes} emergency passes left today.`}</p>` : `
+          <p class="muted small-print">You've used both emergency passes today.</p>`}
+        <button class="btn btn-danger btn-block" data-quit>Stop and lose ${PENALTY_MIN} min</button>
       </div>
     </div>`;
-  overlay.querySelector('[data-keep]').addEventListener('click', renderRunning);
-  overlay.querySelector('[data-quit]').addEventListener('click', () => {
-    finish(false);
+
+  // Μετά από διακοπή: κλείνουμε την οθόνη και ξαναζωγραφίζουμε ό,τι είναι
+  // από κάτω (π.χ. τη λίστα "Today" και το υπόλοιπο στην Αρχική)
+  const stop = (reason, message) => {
+    finish(reason);
     hideOverlay();
-    toast('Session stopped. No time earned');
-    refresh(); // ξαναζωγραφίζει την οθόνη από κάτω (π.χ. τη λίστα "Today")
+    toast(message);
+    refresh();
+  };
+  overlay.querySelector('[data-keep]').addEventListener('click', renderRunning);
+  overlay.querySelector('[data-emergency]')?.addEventListener('click', () => {
+    usePass();
+    stop('emergency', 'Emergency stop. No penalty');
+  });
+  overlay.querySelector('[data-quit]').addEventListener('click', () => {
+    stop('stopped', `Session stopped. ${PENALTY_MIN} min taken from your wallet`);
   });
 }
 
@@ -300,6 +349,11 @@ function renderResult(session) {
 // ελέγχουμε αμέσως αν τελείωσε ο χρόνος.
 
 document.addEventListener('visibilitychange', () => {
+  // Ο ήχος που "περίμενε" επειδή ο χρόνος τελείωσε ενώ έλειπες
+  if (!document.hidden && pendingChime) {
+    pendingChime = false;
+    chime();
+  }
   const a = getActive();
   if (!a) return;
   if (document.hidden) {
@@ -321,10 +375,21 @@ function todaySessions() {
   return getSessions().filter((s) => s.startedAt >= start.getTime());
 }
 
+// Τι δείχνουμε δεξιά σε κάθε συνεδρία της λίστας "Today"
+function sessionValue(s) {
+  if (s.completed) return { text: `+${s.earned}`, cls: 'earned', sub: '' };
+  if (s.reason === 'emergency') return { text: '0', cls: 'muted', sub: ', emergency stop' };
+  // Παλιές συνεδρίες (πριν την ποινή) δεν έχουν penalty
+  return s.penalty
+    ? { text: `−${s.penalty}`, cls: 'is-low', sub: ', stopped early' }
+    : { text: 'Stopped', cls: 'muted', sub: '' };
+}
+
 function render(el) {
   if (!choice) choice = store.get('last', null) || { activity: 'study', minutes: 25 };
   const chips = [...(IS_DEV ? [1] : []), 25, 45, 60, 90];
   const today = todaySessions().slice().reverse();
+  const passes = passesLeft();
 
   el.innerHTML = `
     <h2 class="section-title first">What are you focusing on?</h2>
@@ -349,21 +414,36 @@ function render(el) {
     <p class="earn-line">You'll earn ${earnedFor(choice.minutes)} min of scroll time.</p>
 
     <button class="btn btn-block" data-start>Start focusing</button>
-    <p class="muted small-print">
-      The screen locks until the time is up. To stop early, hold the stop button for 10 seconds
-      and you earn nothing. Locking your phone is fine: the timer keeps going.
-    </p>
+
+    <h2 class="section-title">The rules</h2>
+    <ul class="list">
+      <li><div class="row row-static"><span class="row-text">
+        <span class="row-title">Finish the session</span>
+        <span class="row-sub">Locking your phone is fine, the timer keeps going</span></span>
+        <span class="row-value earned">+${earnedFor(choice.minutes)}</span></div></li>
+      <li><div class="row row-static"><span class="row-text">
+        <span class="row-title">Stop early</span>
+        <span class="row-sub">Hold the stop button for 10 seconds</span></span>
+        <span class="row-value is-low">−${PENALTY_MIN}</span></div></li>
+      <li><div class="row row-static"><span class="row-text">
+        <span class="row-title">Emergency passes left today</span>
+        <span class="row-sub">Stop early without the penalty</span></span>
+        <span class="row-value">${passes}</span></div></li>
+    </ul>
 
     ${today.length ? `
       <h2 class="section-title">Today</h2>
-      <ul class="list">${today.map((s) => `
+      <ul class="list">${today.map((s) => {
+        const v = sessionValue(s);
+        return `
         <li><div class="row row-static">
           <span class="row-text">
             <span class="row-title">${escapeHtml(ACTIVITIES[s.activity].label)}</span>
-            <span class="row-sub">${clock(s.startedAt)}, ${s.minutes} min</span>
+            <span class="row-sub">${clock(s.startedAt)}, ${s.minutes} min${v.sub}</span>
           </span>
-          <span class="row-value ${s.completed ? 'earned' : 'muted'}">${s.completed ? `+${s.earned}` : 'Stopped'}</span>
-        </div></li>`).join('')}
+          <span class="row-value ${v.cls}">${v.text}</span>
+        </div></li>`;
+      }).join('')}
       </ul>` : ''}`;
 
   el.onclick = (ev) => {
