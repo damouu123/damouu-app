@@ -626,6 +626,14 @@ body.locked { overflow: hidden; }
 
 .confirm h2 { margin: 0 0 10px; font-family: var(--serif); font-size: 28px; font-weight: 600; }
 
+/* ===== Wallet ===== */
+.hero-actions { display: grid; gap: 10px; }
+.reward-hint { color: var(--lamp); }
+.field-label { margin: 20px 0 0; font-size: 15px; color: var(--muted); }
+.other-field { margin-top: 14px; }
+.spend-btn { margin-top: 18px; }
+.row .btn-small { flex: none; }
+
 /* ===== Toast: σύντομο μήνυμα που σβήνει μόνο του ===== */
 .toast {
   position: fixed;
