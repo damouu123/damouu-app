@@ -133,26 +133,36 @@ function rightNow() {
   return { now, nowMin, next, gap };
 }
 
-// Όταν σημειώνεις ακύρωση για σήμερα, σε ενημερώνουμε για το κενό που προκύπτει
+// Όταν σημειώνεις ακύρωση μαθήματος, σε ειδοποιούμε πάντα:
+// - σήμερα και το κενό είναι ΤΩΡΑ: πρόταση για focus
+// - σήμερα αργότερα: ποιο είναι το κενό
+// - άλλη μέρα: ποιο μάθημα ακυρώθηκε
 on('attendance:changed', ({ date, id, status }) => {
-  if (status !== 'cancelled' || date !== dateKey(new Date())) return;
-  const entry = entriesForDate(parseKey(date)).find((e) => e.id === id);
+  if (status !== 'cancelled') return;
+  const day = parseKey(date);
+  const entry = entriesForDate(day).find((e) => e.id === id);
   if (!entry) return;
-  const { nowMin } = rightNow();
-  const gap = gapsForDate(parseKey(date)).find((g) => g.start <= toMin(entry.start) && g.end >= toMin(entry.end));
-  if (!gap || gap.end <= nowMin) return;
 
-  if (gap.start <= nowMin && gap.end - nowMin >= MIN_BREAK_LEFT) {
+  if (date !== dateKey(new Date())) {
+    toast(`${entry.title} cancelled on ${day.toLocaleDateString('en-GB', { weekday: 'long' })}`);
+    return;
+  }
+
+  const { nowMin } = rightNow();
+  const gap = gapsForDate(day).find((g) => g.start <= toMin(entry.start) && g.end >= toMin(entry.end));
+  if (gap && gap.start <= nowMin && gap.end - nowMin >= MIN_BREAK_LEFT) {
     // Το κενό είναι ΤΩΡΑ: πρόταση για focus
     ask({
       title: 'You have a break',
-      text: `You're free until ${fromMin(gap.end)} (${duration(gap.end - nowMin)}). Use it for a focus session?`,
+      text: `${entry.title} was cancelled. You're free until ${fromMin(gap.end)} (${duration(gap.end - nowMin)}). Use it for a focus session?`,
       confirmLabel: 'Start focusing',
       cancelLabel: 'Not now',
       danger: false,
     }).then((yes) => { if (yes) navigate('timer'); });
-  } else if (gap.start > nowMin) {
-    toast(`Free ${fromMin(gap.start)}–${fromMin(gap.end)} today`);
+  } else if (gap && gap.start > nowMin) {
+    toast(`${entry.title} cancelled. Free ${fromMin(gap.start)}–${fromMin(gap.end)}`);
+  } else {
+    toast(`${entry.title} cancelled`);
   }
 });
 

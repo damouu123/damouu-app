@@ -49,39 +49,58 @@ export function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+// Φύλλο που ανεβαίνει από κάτω (σαν των εφαρμογών της Apple).
+//   html     το περιεχόμενο μέσα στο φύλλο
+//   setup    (root, close) => ... προσθέτεις κουμπιά/handlers· το close() το κλείνει
+//   onClose  καλείται όταν κλείσει με οποιονδήποτε τρόπο (κουμπί, έξω, Escape)
+// Το κλείσιμο έχει κίνηση: πρώτα η κλάση "closing", μετά αφαιρείται το στοιχείο.
+export function openSheet(html, setup, onClose) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'sheet-backdrop';
+  backdrop.innerHTML = `<div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener('keydown', onKey);
+    backdrop.classList.add('closing');
+    setTimeout(() => backdrop.remove(), 240);
+    if (onClose) onClose();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+
+  // Πάτημα έξω από το φύλλο το κλείνει
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(backdrop);
+  if (setup) setup(backdrop.querySelector('.sheet'), close);
+  return close;
+}
+
 // Ερώτηση επιβεβαίωσης μέσα στο app (αντί για το confirm() του browser,
 // που κάποιοι browsers μπλοκάρουν σιωπηλά). Επιστρέφει Promise<true|false>.
 // Χρήση:  if (await ask({ title: 'Delete?', confirmLabel: 'Delete' })) { ... }
 export function ask({ title, text = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = true }) {
   return new Promise((resolve) => {
-    const sheet = document.createElement('div');
-    sheet.className = 'sheet-backdrop';
-    sheet.innerHTML = `
-      <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="sheet-title">
-        <h2 id="sheet-title">${escapeHtml(title)}</h2>
-        ${text ? `<p class="muted">${escapeHtml(text)}</p>` : ''}
-        <div class="stack">
-          <button class="btn ${danger ? 'btn-danger' : ''} btn-block" data-answer="yes">${escapeHtml(confirmLabel)}</button>
-          <button class="btn btn-quiet btn-block" data-answer="no">${escapeHtml(cancelLabel)}</button>
-        </div>
-      </div>`;
-
-    const close = (answer) => {
-      document.removeEventListener('keydown', onKey);
-      sheet.classList.add('closing'); // το CSS το κατεβάζει με κίνηση
-      setTimeout(() => sheet.remove(), 240);
-      resolve(answer);
-    };
-    const onKey = (e) => { if (e.key === 'Escape') close(false); };
-
-    sheet.addEventListener('click', (e) => {
-      if (e.target === sheet) close(false); // πάτημα έξω από το παράθυρο = Cancel
-      const b = e.target.closest('[data-answer]');
-      if (b) close(b.dataset.answer === 'yes');
-    });
-    document.addEventListener('keydown', onKey);
-    document.body.appendChild(sheet);
-    sheet.querySelector('[data-answer="no"]').focus(); // η ασφαλής επιλογή έχει το focus
+    let answer = false;
+    openSheet(`
+      <h2>${escapeHtml(title)}</h2>
+      ${text ? `<p class="muted">${escapeHtml(text)}</p>` : ''}
+      <div class="stack">
+        <button class="btn ${danger ? 'btn-danger' : ''} btn-block" data-answer="yes">${escapeHtml(confirmLabel)}</button>
+        <button class="btn btn-quiet btn-block" data-answer="no">${escapeHtml(cancelLabel)}</button>
+      </div>`,
+    (root, close) => {
+      root.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-answer]');
+        if (!b) return;
+        answer = b.dataset.answer === 'yes';
+        close();
+      });
+      root.querySelector('[data-answer="no"]').focus(); // η ασφαλής επιλογή έχει το focus
+    },
+    () => resolve(answer));
   });
 }
 

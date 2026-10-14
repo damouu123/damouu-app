@@ -135,10 +135,10 @@ main { padding: 0 20px 32px; }
 .btn-block { width: 100%; }
 
 /* Πάτημα: το κουμπί "βουτάει" λίγο και ανεβαίνει ξανά με απαλή κίνηση */
-.btn, .chip, .icon-btn, .day, .choice, .status-pill {
+.btn, .chip, .icon-btn, .choice {
   transition: transform 0.35s var(--ease), background-color 0.25s, border-color 0.25s, color 0.25s, filter 0.2s;
 }
-.btn:active, .chip:active, .icon-btn:active, .day:active, .choice:active, .status-pill:active {
+.btn:active, .chip:active, .icon-btn:active, .choice:active {
   transform: scale(0.96);
   transition-duration: 0.1s;
 }
@@ -284,78 +284,90 @@ main { padding: 0 20px 32px; }
 .week-label strong { font-family: var(--serif); font-size: 20px; font-weight: 600; }
 .week-label span { font-size: 14px; color: var(--muted); }
 
-/* Λωρίδα ημερών */
-.day-strip {
-  display: flex;
-  gap: 6px;
-  margin-top: 16px;
+/* ===== Schedule: μηνιαίο ημερολόγιο ===== */
+.month-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
+.month-title {
+  padding: 6px 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
-.day {
-  position: relative;
-  flex: 1;
+.month-nav { display: flex; gap: 8px; }
+.mweek {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin-top: 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); margin-top: 6px; }
+.mgrid.swap { animation: rise 0.4s var(--ease) backwards; }
+.mcell {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  min-height: 64px;
-  padding: 8px 0;
-  border: 1px solid transparent;
-  border-radius: var(--r-md);
+  gap: 4px;
+  min-height: 54px;
+  padding: 4px 0 6px;
+  border: none;
   background: none;
-  color: var(--muted);
+  color: var(--text);
   font: inherit;
-  font-size: 13px;
   cursor: pointer;
 }
-.day strong {
-  font-family: var(--serif);
-  font-size: 22px;
-  font-weight: 500;
-  color: var(--text);
-  font-variant-numeric: tabular-nums;
-}
-.day.today strong { color: var(--lamp); }
-.day.selected { background: var(--surface); border-color: var(--line); }
-.day .dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 7px;
-  height: 7px;
+.mcell:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; border-radius: 12px; }
+.mnum {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: var(--danger);
-}
-
-/* ===== Schedule: μαθήματα και κενά ===== */
-.day-list { display: grid; gap: 10px; margin-bottom: 24px; }
-
-.class {
-  display: flex;
-  gap: 14px;
-  padding: 16px;
-  background: var(--surface);
-  border-radius: var(--r-lg);
-  border-left: 4px solid var(--line);
-}
-.class.is-attended { border-left-color: var(--went); }
-.class.is-left { border-left-color: var(--left); }
-.class.is-missed { border-left-color: var(--missed); }
-.class.is-cancelled { border-left-color: transparent; background: none; outline: 1px dashed var(--line); }
-.class.is-cancelled h3 { text-decoration: line-through; color: var(--muted); }
-
-.class-time {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  width: 48px;
-  font-size: 15px;
+  font-size: 17px;
   font-variant-numeric: tabular-nums;
+  transition: background-color 0.25s, color 0.25s, transform 0.35s var(--ease);
 }
-.class-time span:first-child { font-family: var(--serif); font-size: 20px; }
-.class-time span:last-child { color: var(--muted); }
-.class-body { flex: 1; min-width: 0; }
-.class-body h3 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.3; }
-.class-meta { margin: 2px 0 12px; font-size: 14px; color: var(--muted); }
+.mcell:active .mnum { transform: scale(0.88); }
+.mcell.dim { opacity: 0.35; }
+.mcell.today .mnum { color: var(--lamp); font-weight: 650; }
+.mcell.selected .mnum { background: var(--text); color: var(--bg); }
+.mcell.today.selected .mnum { background: var(--lamp); color: var(--lamp-ink); }
+/* Μία κουκκίδα ανά μάθημα */
+.mdots { display: flex; gap: 3px; height: 6px; }
+.d { width: 6px; height: 6px; border-radius: 50%; background: rgba(163, 154, 140, 0.45); }
+.d.went { background: var(--went); }
+.d.left { background: var(--left); }
+.d.missed { background: var(--missed); }
+.d.todo { background: transparent; box-shadow: inset 0 0 0 1.5px var(--danger); }
+
+/* ===== Schedule: λίστα της μέρας ===== */
+.row .state { flex: none; font-size: 14px; color: var(--muted); }
+.state.is-attended { color: var(--went); }
+.state.is-left { color: var(--left); }
+.state.is-missed { color: var(--missed); }
+.state.is-todo { color: var(--danger); font-weight: 600; }
+.list li.gap-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px 8px 78px; /* ευθυγραμμισμένο με τον τίτλο των μαθημάτων */
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--muted);
+}
+.list li.gap-row.is-unexpected { color: var(--lamp); }
+.empty-day { margin: 4px 0 24px; }
+.cancelled-toggle { display: block; margin: 14px 0 0; color: var(--muted); }
+.cancelled-list { margin-top: 10px; }
+.cancelled-list .row-title { text-decoration: line-through; color: var(--muted); }
+.cancelled-list .state { color: var(--lamp); }
+.edit-btn { margin-top: 28px; }
+.sheet .choices { margin-top: 20px; }
 
 /* Τα 4 κουμπιά κατάστασης */
 .choices {
@@ -383,45 +395,6 @@ main { padding: 0 20px 32px; }
 .choice.is-left.selected { background: var(--left); }
 .choice.is-missed.selected { background: var(--missed); }
 .choice.is-cancelled.selected { background: var(--muted); }
-
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 40px;
-  padding: 0 14px;
-  border: none;
-  border-radius: 999px;
-  color: var(--bg);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 650;
-  cursor: pointer;
-}
-.status-pill span { font-weight: 400; opacity: 0.7; }
-.status-pill.is-attended { background: var(--went); }
-.status-pill.is-left { background: var(--left); }
-.status-pill.is-missed { background: var(--missed); }
-.status-pill.is-cancelled { background: var(--surface-press); color: var(--muted); }
-
-.upcoming {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 4px 12px;
-  font-size: 15px;
-}
-
-.gap {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px 10px 82px;
-  font-size: 15px;
-  color: var(--muted);
-}
-.gap.is-unexpected { color: var(--lamp); }
 
 /* ===== Φόρμες ===== */
 .form { display: grid; gap: 18px; }

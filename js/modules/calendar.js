@@ -11,7 +11,7 @@
 
 import { register, emit } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { navigate, escapeHtml, setTitle, ask, toast } from '../core/router.js';
+import { navigate, escapeHtml, setTitle, ask, toast, openSheet } from '../core/router.js';
 import { SEED_SCHEDULE } from '../../data/schedule.js';
 
 const store = moduleStore('calendar');
@@ -203,28 +203,24 @@ function metaLine(e) {
   return [type, e.room, e.teacher].filter(Boolean).join(', ');
 }
 
-// ===================== Οθόνη: εβδομάδα =====================
+// ===================== Οθόνη: μηνιαίο ημερολόγιο =====================
+// Πάνω ο μήνας (σαν το Calendar της Apple), με κουκκίδες ανά μάθημα.
+// Κάτω τα μαθήματα της μέρας που διάλεξες. Πάτημα σε μάθημα ανοίγει ένα
+// φύλλο με τις ενέργειες. Τα ΑΚΥΡΩΜΕΝΑ φεύγουν από το ημερολόγιο: δεν έχουν
+// κουκκίδα και δεν φαίνονται στη λίστα (μένει μόνο ένα "Cancelled (1)"
+// για να τα επαναφέρεις).
 
-let selected = null; // η μέρα που βλέπουμε
-let changing = null; // το key του μαθήματος που αλλάζουμε κατάσταση
+let selected = null;       // η μέρα που βλέπουμε
+let shownMonth = null;     // η 1η του μήνα που δείχνει το ημερολόγιο
+let showCancelled = false; // ανοιχτή η λίστα ακυρωμένων της μέρας
+let swap = false;          // να παίξει η κίνηση αλλαγής μήνα στην επόμενη ζωγραφική
 
-// Ποιες μέρες δείχνουμε: Δευτέρα–Παρασκευή, και Σαβ/Κυρ μόνο αν έχουν μάθημα
-function visibleDays(ws) {
-  const sched = getSchedule();
-  const weekend = [6, 7].filter((d) => sched.some((e) => e.day === d));
-  return [1, 2, 3, 4, 5, ...weekend].map((d) => addDays(ws, d - 1));
-}
-
-// Σήμερα, εκτός αν είναι Σαββατοκύριακο χωρίς μαθήματα: τότε η επόμενη Δευτέρα
-function defaultDay() {
-  const today = startOfDay(new Date());
-  const wd = weekday(today);
-  if (wd >= 6 && !getSchedule().some((e) => e.day === wd)) return addDays(weekStart(today), 7);
-  return today;
-}
+const WEEK_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// Χρώμα κουκκίδας ανά κατάσταση
+const DOT = { attended: 'went', left: 'left', missed: 'missed' };
 
 // Τίτλος εβδομάδας: { range: "12–16 October", rel: "This week" }
-// days: οι μέρες που δείχνουμε (αρκεί η πρώτη και η τελευταία)
+// days: οι μέρες που δείχνουμε (αρκεί η πρώτη και η τελευταία). Το χρησιμοποιεί το Weekly review.
 export function weekHeading(days) {
   const month = (d) => d.toLocaleDateString('en-GB', { month: 'long' });
   const a = days[0];
@@ -240,121 +236,189 @@ export function weekHeading(days) {
   return { range, rel };
 }
 
-function classHtml(e, now) {
-  const started = e.startsAt <= now;
-  let actions;
+// Όλες οι μέρες που φαίνονται στο πλέγμα: από τη Δευτέρα της εβδομάδας
+// της 1ης του μήνα έως την Κυριακή της εβδομάδας της τελευταίας μέρας.
+function monthDays(first) {
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0);
+  const days = [];
+  for (let d = weekStart(first); d <= addDays(weekStart(last), 6); d = addDays(d, 1)) days.push(d);
+  return days;
+}
 
-  if (e.status && changing !== e.key) {
-    // Έχει σημειωθεί: δείχνουμε την κατάσταση, πάτημα = αλλαγή
-    actions = `
-      <button class="status-pill is-${e.status}" data-change="${e.key}">
-        ${STATUSES[e.status].label}<span>Change</span>
-      </button>`;
-  } else if (started) {
-    // Ξεκίνησε: όλες οι επιλογές (πάτημα στην ήδη επιλεγμένη = σβήσιμο)
-    actions = `<div class="choices">${Object.entries(STATUSES).map(([s, { label }]) => `
-      <button class="choice is-${s} ${e.status === s ? 'selected' : ''}" data-set="${s}" data-key="${e.key}">${label}</button>`).join('')}
-    </div>`;
-  } else {
-    // Δεν ξεκίνησε: μόνο ακύρωση (π.χ. το ανακοίνωσε ο καθηγητής)
-    const isCancelled = e.status === 'cancelled';
-    actions = `
-      <div class="upcoming">
-        <span class="muted">Starts at ${e.start}</span>
-        <button class="link-btn" data-set="${isCancelled ? 'none' : 'cancelled'}" data-key="${e.key}">
-          ${isCancelled ? 'Not cancelled after all' : 'Mark as cancelled'}
-        </button>
-      </div>`;
+function cellHtml(d, now) {
+  const live = entriesForDate(d).filter((e) => e.status !== 'cancelled');
+  const cls = [
+    d.getMonth() !== shownMonth.getMonth() && 'dim',
+    sameDay(d, now) && 'today',
+    sameDay(d, selected) && 'selected',
+  ].filter(Boolean).join(' ');
+  // Μία κουκκίδα ανά μάθημα: γεμάτη αν το σημείωσες, κόκκινος κύκλος αν έχει
+  // τελειώσει και δεν το σημείωσες, αχνή αν δεν έχει γίνει ακόμα
+  const dots = live.map((e) => `<i class="d ${DOT[e.status] || (e.endsAt <= now ? 'todo' : '')}"></i>`).join('');
+  const label = `${d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}, `
+    + `${live.length} ${live.length === 1 ? 'class' : 'classes'}`;
+  return `
+    <button class="mcell ${cls}" data-day="${dateKey(d)}" aria-label="${label}"
+            ${sameDay(d, selected) ? 'aria-current="date"' : ''}>
+      <span class="mnum">${d.getDate()}</span>
+      <span class="mdots">${dots}</span>
+    </button>`;
+}
+
+// "Lecture, Δ23"  /  "Tutorial (Μ-Ω), ΗΥ3"
+function shortMeta(e) {
+  const type = e.type === 'tutorial' ? `Tutorial${e.group ? ` (${e.group})` : ''}` : 'Lecture';
+  return [type, e.room].filter(Boolean).join(', ');
+}
+
+function rowHtml(e, now) {
+  let state = '';
+  if (e.status) state = `<span class="state is-${e.status}">${STATUSES[e.status].label}</span>`;
+  else if (e.endsAt <= now) state = '<span class="state is-todo">Mark</span>'; // τελείωσε, δεν το σημείωσες
+  return `
+    <li><button class="row" data-class="${e.key}">
+      <span class="row-time">${e.start}<br>${e.end}</span>
+      <span class="row-text">
+        <span class="row-title">${escapeHtml(e.title)}</span>
+        <span class="row-sub">${escapeHtml(shortMeta(e))}</span>
+      </span>
+      ${state}<span class="row-chevron" aria-hidden="true">›</span>
+    </button></li>`;
+}
+
+function gapRow(g) {
+  return `
+    <li class="gap-row ${g.unexpected ? 'is-unexpected' : ''}">
+      <span>${g.unexpected ? 'Free, class cancelled' : 'Free'}</span>
+      <span>${fromMin(g.start)}–${fromMin(g.end)}, ${duration(g.end - g.start)}</span>
+    </li>`;
+}
+
+function renderMonth(el) {
+  const now = new Date();
+  if (!shownMonth) {
+    selected = startOfDay(now);
+    shownMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   }
 
-  return `
-    <article class="class ${e.status ? `is-${e.status}` : ''}">
-      <div class="class-time"><span>${e.start}</span><span>${e.end}</span></div>
-      <div class="class-body">
-        <h3>${escapeHtml(e.title)}</h3>
-        <p class="class-meta">${escapeHtml(metaLine(e))}</p>
-        ${actions}
-      </div>
-    </article>`;
-}
-
-function gapHtml(g) {
-  return `
-    <div class="gap ${g.unexpected ? 'is-unexpected' : ''}">
-      <span>${g.unexpected ? 'Free, class cancelled' : 'Free'} ${fromMin(g.start)}–${fromMin(g.end)}</span>
-      <span>${duration(g.end - g.start)}</span>
-    </div>`;
-}
-
-function renderWeek(el) {
-  const now = new Date();
-  if (!selected) selected = defaultDay();
-  const days = visibleDays(weekStart(selected));
-  if (!days.some((d) => sameDay(d, selected))) selected = days[0];
-
-  const { range, rel } = weekHeading(days);
   const entries = entriesForDate(selected);
-
-  // Μαθήματα και κενά σε μία λίστα, με σειρά ώρας
+  const live = entries.filter((e) => e.status !== 'cancelled');
+  const cancelled = entries.filter((e) => e.status === 'cancelled');
+  // Μαθήματα και κενά μαζί, με σειρά ώρας
   const items = [
-    ...entries.map((e) => ({ at: toMin(e.start), html: classHtml(e, now) })),
-    ...gapsForDate(selected).map((g) => ({ at: g.start, html: gapHtml(g) })),
+    ...live.map((e) => ({ at: toMin(e.start), html: rowHtml(e, now) })),
+    ...gapsForDate(selected).map((g) => ({ at: g.start, html: gapRow(g) })),
   ].sort((a, b) => a.at - b.at);
 
-  const strip = days.map((d) => {
-    const cls = [sameDay(d, selected) && 'selected', sameDay(d, now) && 'today'].filter(Boolean).join(' ');
-    const dot = unmarked(d, now).length ? '<i class="dot" aria-label="Classes to mark"></i>' : '';
-    return `
-      <button class="day ${cls}" data-day="${dateKey(d)}">
-        <span>${d.toLocaleDateString('en-GB', { weekday: 'short' })}</span>
-        <strong>${d.getDate()}</strong>${dot}
-      </button>`;
-  }).join('');
+  const title = shownMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  const heading = selected.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   el.innerHTML = `
-    <div class="week-nav">
-      <button class="icon-btn" data-week="-1" aria-label="Previous week">‹</button>
-      <button class="week-label" data-week="0" aria-label="Back to today">
-        <strong>${range}</strong><span>${rel}</span>
-      </button>
-      <button class="icon-btn" data-week="1" aria-label="Next week">›</button>
+    <div class="month-head">
+      <button class="month-title" data-month="0" aria-label="Go to today">${title}</button>
+      <div class="month-nav">
+        <button class="icon-btn" data-month="-1" aria-label="Previous month">‹</button>
+        <button class="icon-btn" data-month="1" aria-label="Next month">›</button>
+      </div>
     </div>
-    <div class="day-strip">${strip}</div>
-    <h2 class="section-title">${DAY_NAMES[weekday(selected) - 1]}</h2>
-    <div class="day-list">
-      ${items.length ? items.map((i) => i.html).join('') : `
-        <div class="placeholder"><p>No classes on this day.</p>
-        <p class="muted">Use Edit schedule to add one.</p></div>`}
-    </div>
-    <button class="btn btn-quiet btn-block" data-edit>Edit schedule</button>`;
+    <div class="mweek" aria-hidden="true">${WEEK_LABELS.map((w) => `<span>${w}</span>`).join('')}</div>
+    <div class="mgrid ${swap ? 'swap' : ''}">${monthDays(shownMonth).map((d) => cellHtml(d, now)).join('')}</div>
+
+    <h2 class="section-title">${heading}</h2>
+    ${items.length
+      ? `<ul class="list">${items.map((i) => i.html).join('')}</ul>`
+      : '<p class="muted empty-day">No classes.</p>'}
+
+    ${cancelled.length ? `
+      <button class="link-btn cancelled-toggle" data-toggle>
+        ${showCancelled ? 'Hide' : 'Show'} cancelled (${cancelled.length})</button>
+      ${showCancelled ? `<ul class="list cancelled-list">${cancelled.map((e) => `
+        <li><button class="row" data-restore="${e.key}">
+          <span class="row-time">${e.start}<br>${e.end}</span>
+          <span class="row-text"><span class="row-title">${escapeHtml(e.title)}</span>
+            <span class="row-sub">${escapeHtml(shortMeta(e))}</span></span>
+          <span class="state">Restore</span>
+        </button></li>`).join('')}</ul>` : ''}` : ''}
+
+    <button class="btn btn-quiet btn-block edit-btn" data-edit>Edit schedule</button>`;
+  swap = false;
+
+  const findEntry = (key) => entriesForDate(parseKey(key.split('|')[0])).find((x) => x.key === key);
 
   // Ένας click handler για όλη την οθόνη ("event delegation")
   el.onclick = (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
     const d = b.dataset;
-    if (d.week) {
-      selected = d.week === '0' ? defaultDay() : addDays(selected, 7 * Number(d.week));
-      changing = null;
+    if (d.month !== undefined) {
+      const delta = Number(d.month);
+      const today = startOfDay(new Date());
+      shownMonth = delta === 0
+        ? new Date(today.getFullYear(), today.getMonth(), 1)
+        : new Date(shownMonth.getFullYear(), shownMonth.getMonth() + delta, 1);
+      // Στον τρέχοντα μήνα επιλέγουμε σήμερα, αλλιώς την 1η
+      selected = shownMonth.getMonth() === today.getMonth() && shownMonth.getFullYear() === today.getFullYear()
+        ? today : shownMonth;
+      showCancelled = false;
+      swap = true;
     } else if (d.day) {
       selected = parseKey(d.day);
-      changing = null;
-    } else if (d.change) {
-      changing = d.change;
-    } else if (d.set) {
-      const entry = entriesForDate(parseKey(d.key.split('|')[0])).find((x) => x.key === d.key);
+      if (selected.getMonth() !== shownMonth.getMonth()) { // μέρα γειτονικού μήνα: πάμε εκεί
+        shownMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
+        swap = true;
+      }
+      showCancelled = false;
+    } else if (d.class) {
+      const entry = findEntry(d.class);
+      if (entry) openClassSheet(entry, el);
+      return;
+    } else if (d.restore) {
+      const entry = findEntry(d.restore);
       if (!entry) return;
-      const status = d.set === 'none' || entry.status === d.set ? null : d.set;
-      setStatus(entry, status);
-      changing = null;
+      setStatus(entry, null);
+      toast(`${entry.title} is back in your calendar`);
+    } else if ('toggle' in d) {
+      showCancelled = !showCancelled;
     } else if ('edit' in d) {
       navigate('calendar/edit');
       return;
     } else {
       return;
     }
-    renderWeek(el);
+    renderMonth(el);
   };
+}
+
+// Φύλλο ενεργειών ενός μαθήματος
+function openClassSheet(entry, el) {
+  const started = entry.startsAt <= new Date();
+  const day = parseKey(entry.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const actions = started
+    // Ξεκίνησε: όλες οι επιλογές (πάτημα στην ήδη επιλεγμένη = σβήσιμο)
+    ? `<div class="choices">${Object.entries(STATUSES).map(([s, { label }]) => `
+        <button class="choice is-${s} ${entry.status === s ? 'selected' : ''}" data-set="${s}">${label}</button>`).join('')}
+      </div>`
+    // Δεν ξεκίνησε: μόνο ακύρωση (π.χ. το ανακοίνωσε ο καθηγητής)
+    : `<div class="stack">
+        <button class="btn btn-danger btn-block" data-set="cancelled">Cancel this class</button>
+      </div>
+      <p class="muted small-print">You can mark attendance once the class starts.</p>`;
+
+  openSheet(`
+    <h2>${escapeHtml(entry.title)}</h2>
+    <p class="muted">${day}, ${entry.start}–${entry.end}</p>
+    <p class="muted">${escapeHtml(metaLine(entry))}</p>
+    ${actions}`,
+  (root, close) => {
+    root.addEventListener('click', (ev) => {
+      const b = ev.target.closest('[data-set]');
+      if (!b) return;
+      const status = entry.status === b.dataset.set ? null : b.dataset.set;
+      close();
+      setStatus(entry, status); // στέλνει "attendance:changed": εκεί γίνεται και η ειδοποίηση
+      renderMonth(el);
+    });
+  });
 }
 
 // ===================== Οθόνη: επεξεργασία προγράμματος =====================
@@ -531,16 +595,17 @@ register({
     return { value: when, label: next.title };
   },
 
-  // #/calendar -> εβδομάδα, #/calendar/edit -> λίστα, #/calendar/edit/<id> -> φόρμα
+  // #/calendar -> μήνας, #/calendar/edit -> λίστα, #/calendar/edit/<id> -> φόρμα
   render(el, params = []) {
     if (params[0] === 'edit' && params[1]) renderForm(el, params[1]);
     else if (params[0] === 'edit') renderEditList(el);
-    else renderWeek(el);
+    else renderMonth(el);
   },
 
   // Όταν φεύγουμε από το Schedule, την επόμενη φορά ξεκινάμε από σήμερα
   unmount() {
     selected = null;
-    changing = null;
+    shownMonth = null;
+    showCancelled = false;
   },
 });
