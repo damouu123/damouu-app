@@ -32,9 +32,21 @@ export function icon(paths) {
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 }
 
-// Σύντομο μήνυμα κάτω από την οθόνη που σβήνει μόνο του (π.χ. "+10 XP")
-let toastTimer = null;
+// Σύντομο μήνυμα κάτω από την οθόνη που σβήνει μόνο του (π.χ. "+10 XP").
+// Αν έρθουν πολλά μαζί, μπαίνουν σε ουρά και εμφανίζονται ένα-ένα.
+const toastQueue = [];
+let toastBusy = false;
+
 export function toast(text) {
+  toastQueue.push(text);
+  if (toastQueue.length > 3) toastQueue.shift(); // όχι ατελείωτη ουρά
+  if (!toastBusy) nextToast();
+}
+
+function nextToast() {
+  const text = toastQueue.shift();
+  if (text === undefined) { toastBusy = false; return; }
+  toastBusy = true;
   let el = document.getElementById('toast');
   if (!el) {
     el = document.createElement('div');
@@ -45,8 +57,10 @@ export function toast(text) {
   }
   el.textContent = text;
   el.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(nextToast, 300); // λίγο κενό ανάμεσα σε δύο μηνύματα
+  }, 2200);
 }
 
 // Φύλλο που ανεβαίνει από κάτω (σαν των εφαρμογών της Apple).

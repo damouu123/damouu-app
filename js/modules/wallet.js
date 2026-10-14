@@ -13,11 +13,12 @@
 //   claims  { "2026-10-05": { minutes, at } }  rewards ανά εβδομάδα (κλειδί = Δευτέρα)
 //   places  ["Reddit", ...]  δικά σου "πού" (εκτός από τα έτοιμα)
 
-import { register } from '../core/registry.js';
+import { register, emit } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, toast, ask, openSheet, refresh } from '../core/router.js';
 import { getSessions, ACTIVITIES } from './timer.js';
 import { weekStats } from './resume.js';
+import { SCROLL_XP_PER_MIN } from './xp.js';
 import { weekStart, addDays, dateKey, parseKey, startOfDay } from './calendar.js';
 
 const store = moduleStore('wallet');
@@ -145,8 +146,8 @@ export function openLogSheet(onDone) {
             <input id="other-place" maxlength="30" autocomplete="off" placeholder="For example Reddit"
                    value="${escapeHtml(form.otherText)}"></label>` : ''}
         <p class="form-error" role="alert" hidden></p>
-        ${balance - form.minutes < 0
-          ? `<p class="muted small-print">This puts you at ${signed(balance - form.minutes)} min.</p>` : ''}
+        <p class="muted small-print">Costs ${form.minutes * SCROLL_XP_PER_MIN} XP.${balance - form.minutes < 0
+          ? ` This puts you at ${signed(balance - form.minutes)} min.` : ''}</p>
         <button class="btn btn-block spend-btn" data-log>Log ${form.minutes} min</button>`;
     };
     paint();
@@ -182,6 +183,7 @@ export function openLogSheet(onDone) {
           id: `p${Date.now().toString(36)}`, minutes: form.minutes, where, at: Date.now(),
         }], []);
         toast(`Logged ${form.minutes} min on ${where}`);
+        emit('wallet:changed'); // το XP δείχνει "−N XP"
         close();
         if (onDone) onDone();
         return;
@@ -311,6 +313,7 @@ function render(el) {
         if (!yes) return;
         store.update('spends', (list) => list.filter((s) => s.id !== d.delete), []);
         toast('Entry deleted');
+        emit('wallet:changed');
         render(el);
       });
     }
