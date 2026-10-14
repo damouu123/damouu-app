@@ -25,6 +25,8 @@
   --r-lg: 20px;   /* μεγάλα κομμάτια */
   --r-md: 14px;   /* κουμπιά */
   --tabbar-h: 60px;
+  /* Η καμπύλη κίνησης του iOS: γρήγορη εκκίνηση, απαλή επιβράδυνση */
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
   /* Περιθώρια ασφαλείας για notch και home indicator */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -131,6 +133,15 @@ main { padding: 0 20px 32px; }
 }
 .btn:active { filter: brightness(0.9); }
 .btn-block { width: 100%; }
+
+/* Πάτημα: το κουμπί "βουτάει" λίγο και ανεβαίνει ξανά με απαλή κίνηση */
+.btn, .chip, .icon-btn, .day, .choice, .status-pill {
+  transition: transform 0.35s var(--ease), background-color 0.25s, border-color 0.25s, color 0.25s, filter 0.2s;
+}
+.btn:active, .chip:active, .icon-btn:active, .day:active, .choice:active, .status-pill:active {
+  transform: scale(0.96);
+  transition-duration: 0.1s;
+}
 .btn-quiet {
   background: transparent;
   color: var(--text);
@@ -508,29 +519,81 @@ main { padding: 0 20px 32px; }
 /* ===== Focus: οθόνη επιλογής ===== */
 .section-title.first { margin-top: 8px; }
 
-.activity-picker {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+main > .segmented { margin-top: 8px; }
+
+/* Τροχός επιλογής λεπτών (σαν των ρολογιών του iPhone) */
+.wheel {
+  --item: 52px; /* ίδιο με το ITEM_H στο timer.js */
+  position: relative;
+  height: calc(var(--item) * 5);
+  margin-top: 20px;
+  border-radius: var(--r-lg);
 }
-.activity {
+.wheel:focus-visible { outline: 2px solid var(--lamp); outline-offset: 4px; }
+.wheel-lens {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(var(--item) * 2);
+  height: var(--item);
+  background: var(--surface);
+  border-radius: 14px;
+}
+.wheel-scroll {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  -webkit-mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(transparent, #000 30%, #000 70%, transparent);
+}
+.wheel-scroll::-webkit-scrollbar { display: none; }
+.wheel-pad { height: calc(var(--item) * 2); }
+.wheel-item {
+  height: var(--item);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 92px;
-  padding: 12px 6px;
-  border: 1px solid var(--line);
-  border-radius: var(--r-md);
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 15px;
-  cursor: pointer;
+  scroll-snap-align: center;
+  font-family: var(--serif);
+  font-size: 34px;
+  font-variant-numeric: lining-nums tabular-nums;
+  opacity: 0.18;
+  transform: scale(0.78);
+  -webkit-user-select: none;
+  user-select: none;
 }
-.activity.selected { border-color: var(--lamp); color: var(--lamp); background: var(--surface); }
+.wheel-unit {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 46px);
+  transform: translateY(-50%);
+  font-size: 20px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.wheel-caption {
+  height: 22px;
+  margin: 8px 0 0;
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+}
 
+.presets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 28px;
+}
+.presets .chip { width: 100%; padding: 0; }
+.start-note { margin: 14px 0 0; text-align: center; font-size: 14px; }
+
+/* (στο Wallet ο ίδιος μετρητής με κουμπιά − / +) */
 .duration {
   display: flex;
   align-items: center;
@@ -560,7 +623,6 @@ main { padding: 0 20px 32px; }
 }
 .chip.selected { border-color: var(--lamp); color: var(--lamp); }
 
-.earn-line { margin: 20px 0 16px; color: var(--lamp); }
 .small-print { margin: 14px 0 0; font-size: 14px; }
 .row-value.earned { color: var(--lamp); }
 
@@ -580,25 +642,52 @@ body.locked { overflow: hidden; }
   overflow-y: auto;
 }
 .focus-inner { margin: auto 0; }
+.focus-inner .muted { margin: 14px 0 0; font-size: 15px; }
+.focus-inner.running {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
 .focus-activity {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   margin: 0;
   color: var(--muted);
 }
+
+/* Δακτύλιος: αδειάζει όσο περνάει ο χρόνος */
+.ring {
+  position: relative;
+  width: min(78vw, 300px);
+  aspect-ratio: 1;
+  margin: 28px 0 8px;
+}
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.ring-track, .ring-bar { fill: none; stroke-width: 8; }
+.ring-track { stroke: var(--surface-press); }
+.ring-bar {
+  stroke: var(--lamp);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s linear;
+}
 .focus-time {
-  margin: 8px 0 20px;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
   font-family: var(--serif);
-  font-size: clamp(72px, 24vw, 120px);
+  font-size: clamp(44px, 14vw, 64px);
   font-weight: 500;
   line-height: 1;
-  color: var(--lamp);
+  color: var(--text);
   font-variant-numeric: lining-nums tabular-nums;
   letter-spacing: -0.02em;
 }
-.focus-progress span { background: var(--lamp); transition: none; }
-.focus-inner .muted { margin: 14px 0 0; font-size: 15px; }
+.focus-ends { font-size: 15px; }
 
 /* Κουμπί παρατεταμένου πατήματος */
 .hold-btn {
@@ -681,6 +770,25 @@ body.locked { overflow: hidden; }
 .sheet p { margin: 0; }
 .sheet .stack { margin-top: 20px; }
 
+/* Το παράθυρο ανεβαίνει από κάτω, και κατεβαίνει όταν κλείνει */
+.sheet-backdrop { animation: fade-in 0.3s ease backwards; }
+.sheet { animation: sheet-up 0.5s var(--ease) backwards; }
+.sheet-backdrop.closing { animation: fade-out 0.22s ease forwards; pointer-events: none; }
+.sheet-backdrop.closing .sheet { animation: sheet-down 0.22s ease-in forwards; }
+
+/* ===== Κινήσεις ===== */
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } }
+@keyframes sheet-down { to { transform: translateY(40px); opacity: 0; } }
+@keyframes rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes focus-in { from { opacity: 0; transform: scale(1.04); } }
+
+/* Κάθε φορά που αλλάζει οθόνη, το περιεχόμενο ανεβαίνει απαλά */
+#view.enter { animation: rise 0.45s var(--ease) backwards; }
+.focus-screen { animation: focus-in 0.5s var(--ease) backwards; }
+.focus-inner { animation: rise 0.5s var(--ease) backwards; }
+
 /* ===== Toast: σύντομο μήνυμα που σβήνει μόνο του ===== */
 .toast {
   position: fixed;
@@ -695,14 +803,19 @@ body.locked { overflow: hidden; }
   font-weight: 650;
   white-space: nowrap;
   opacity: 0;
-  transform: translate(-50%, 8px);
-  transition: opacity 0.2s, transform 0.2s;
+  transform: translate(-50%, 12px) scale(0.96);
+  transition: opacity 0.25s, transform 0.45s var(--ease);
   pointer-events: none;
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0) scale(1); }
 
+/* Όποιος έχει ενεργοποιήσει "Reduce Motion" στο iPhone δεν βλέπει κινήσεις */
 @media (prefers-reduced-motion: reduce) {
-  .toast, .progress span { transition: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* ===== Οθόνη που δεν έχει φτιαχτεί ακόμα ===== */

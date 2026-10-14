@@ -37,17 +37,22 @@ export const ACTIVITIES = {
   workout: { label: 'Workout', icon: '<path d="M3 9.5v5M6 7v10M18 7v10M21 9.5v5M6 12h12"/>' },
 };
 
-// Κάθε 2 λεπτά εστίασης = 1 λεπτό scroll (κανονική στρογγυλοποίηση: 25 -> 13)
+// Κάθε 2 λεπτά εστίασης = 1 λεπτό scroll, στρογγυλοποίηση ΠΡΟΣ ΤΑ ΚΑΤΩ
+// (25 -> 12, 1 -> 0). Αν στρογγυλοποιούσαμε προς τα πάνω, πολλές συνεδρίες
+// του 1 λεπτού θα έδιναν διπλάσια λεπτά από όσα πρέπει.
 export const EARN_RATE = 0.5;
-export const earnedFor = (minutes) => Math.round(minutes * EARN_RATE);
+export const earnedFor = (minutes) => Math.floor(minutes * EARN_RATE);
 
 export const PENALTY_MIN = 5; // λεπτά που χάνεις από το πορτοφόλι αν σταματήσεις νωρίς
 const PASSES_PER_DAY = 2;
 const HOLD_MS = 10000; // πόση ώρα κρατάς πατημένο για να σταματήσεις
-const MIN_MIN = 5;
-const MAX_MIN = 180;
-// Στον υπολογιστή (localhost) δείχνουμε και επιλογή 1 λεπτού για δοκιμές
-const IS_DEV = ['localhost', '127.0.0.1'].includes(location.hostname);
+const MIN_MIN = 1;     // από 1 λεπτό...
+const MAX_MIN = 300;   // ...έως 5 ώρες
+const PRESETS = [15, 30, 45, 60];
+const ITEM_H = 52;     // ύψος μιας γραμμής του τροχού (px), πρέπει να ταιριάζει με το CSS
+const HOLD_LABEL = 'Hold to stop';
+const RING_R = 108;                  // ακτίνα του δακτυλίου στο SVG
+const RING_C = 2 * Math.PI * RING_R; // περιφέρεια: το "μήκος" του δακτυλίου
 
 export function getSessions() {
   return store.get('sessions', []);
@@ -212,17 +217,21 @@ function renderRunning() {
   if (!a || !overlay) return;
   overlay.dataset.view = 'running';
   overlay.innerHTML = `
-    <div class="focus-inner">
+    <div class="focus-inner running">
       <p class="focus-activity">${icon(ACTIVITIES[a.activity].icon)} ${ACTIVITIES[a.activity].label}</p>
-      <p class="focus-time" aria-live="off">${fmt(a.endsAt - Date.now())}</p>
-      <div class="progress focus-progress"><span></span></div>
-      <p class="muted">Ends at ${clock(a.endsAt)}. You'll earn ${earnedFor(a.minutes)} min of scroll time.</p>
-      <p class="muted">You can lock your phone, the timer keeps going.
-        Stopping early costs you ${PENALTY_MIN} min from your wallet.</p>
+      <div class="ring">
+        <svg viewBox="0 0 240 240" aria-hidden="true">
+          <circle class="ring-track" cx="120" cy="120" r="${RING_R}"/>
+          <circle class="ring-bar" cx="120" cy="120" r="${RING_R}"
+                  stroke-dasharray="${RING_C}" stroke-dashoffset="0"/>
+        </svg>
+        <p class="focus-time" aria-live="off">${fmt(a.endsAt - Date.now())}</p>
+      </div>
+      <p class="muted focus-ends">Ends at ${clock(a.endsAt)}</p>
     </div>
     <button class="hold-btn" type="button">
       <span class="hold-fill" aria-hidden="true"></span>
-      <span class="hold-label">Hold for 10 seconds to stop</span>
+      <span class="hold-label">${HOLD_LABEL}</span>
     </button>`;
   bindHold(overlay.querySelector('.hold-btn'), renderConfirm);
 }
@@ -240,8 +249,9 @@ function tick() {
   }
   if (overlay.dataset.view !== 'running') return;
   overlay.querySelector('.focus-time').textContent = fmt(a.endsAt - now);
-  const total = a.minutes * 60000;
-  overlay.querySelector('.focus-progress span').style.width = `${(1 - (a.endsAt - now) / total) * 100}%`;
+  // Ο δακτύλιος αδειάζει όσο περνάει ο χρόνος
+  const elapsed = Math.min(1, (now - a.startedAt) / (a.minutes * 60000));
+  overlay.querySelector('.ring-bar').style.strokeDashoffset = RING_C * elapsed;
 }
 
 // Παρατεταμένο πάτημα: η μπάρα γεμίζει (εικόνα) και ένα setTimeout
@@ -258,7 +268,7 @@ function bindHold(btn, onDone) {
     cancelAnimationFrame(raf);
     clearTimeout(timer);
     fill.style.transform = 'scaleX(0)';
-    label.textContent = 'Hold for 10 seconds to stop';
+    label.textContent = HOLD_LABEL;
   };
   const frame = () => {
     if (startT === null) return;
@@ -385,51 +395,46 @@ function sessionValue(s) {
     : { text: 'Stopped', cls: 'muted', sub: '' };
 }
 
+// 90 -> "1 h 30 min", 120 -> "2 h"
+const hoursText = (m) => (m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`);
+
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function render(el) {
-  if (!choice) choice = store.get('last', null) || { activity: 'study', minutes: 25 };
-  const chips = [...(IS_DEV ? [1] : []), 25, 45, 60, 90];
+  const saved = store.get('last', null);
+  if (!choice) {
+    choice = {
+      activity: saved && ACTIVITIES[saved.activity] ? saved.activity : 'study',
+      minutes: Math.min(MAX_MIN, Math.max(MIN_MIN, Number(saved && saved.minutes) || 30)),
+    };
+  }
   const today = todaySessions().slice().reverse();
-  const passes = passesLeft();
 
   el.innerHTML = `
-    <h2 class="section-title first">What are you focusing on?</h2>
-    <div class="activity-picker">
+    <div class="segmented" role="radiogroup" aria-label="Activity">
       ${Object.entries(ACTIVITIES).map(([id, a]) => `
-        <button class="activity ${choice.activity === id ? 'selected' : ''}" data-activity="${id}"
-                aria-pressed="${choice.activity === id}">
-          ${icon(a.icon)}<span>${a.label}</span>
-        </button>`).join('')}
+        <label><input type="radio" name="activity" value="${id}" ${choice.activity === id ? 'checked' : ''}>
+          <span>${a.label}</span></label>`).join('')}
     </div>
 
-    <h2 class="section-title">For how long?</h2>
-    <div class="duration">
-      <button class="icon-btn" data-step="-5" aria-label="5 minutes less">−</button>
-      <p><strong>${choice.minutes}</strong><span>min</span></p>
-      <button class="icon-btn" data-step="5" aria-label="5 minutes more">+</button>
+    <div class="wheel" tabindex="0" role="slider" aria-label="Minutes"
+         aria-valuemin="${MIN_MIN}" aria-valuemax="${MAX_MIN}">
+      <div class="wheel-lens" aria-hidden="true"></div>
+      <div class="wheel-scroll">
+        <div class="wheel-pad"></div>
+        ${Array.from({ length: MAX_MIN }, (_, i) => `<div class="wheel-item">${i + 1}</div>`).join('')}
+        <div class="wheel-pad"></div>
+      </div>
+      <span class="wheel-unit" aria-hidden="true">min</span>
     </div>
-    <div class="chips">
-      ${chips.map((m) => `
-        <button class="chip ${choice.minutes === m ? 'selected' : ''}" data-minutes="${m}">${m} min</button>`).join('')}
+    <p class="wheel-caption" aria-live="polite"></p>
+
+    <div class="presets">
+      ${PRESETS.map((m) => `<button class="chip" data-minutes="${m}">${m}</button>`).join('')}
     </div>
-    <p class="earn-line">You'll earn ${earnedFor(choice.minutes)} min of scroll time.</p>
 
-    <button class="btn btn-block" data-start>Start focusing</button>
-
-    <h2 class="section-title">The rules</h2>
-    <ul class="list">
-      <li><div class="row row-static"><span class="row-text">
-        <span class="row-title">Finish the session</span>
-        <span class="row-sub">Locking your phone is fine, the timer keeps going</span></span>
-        <span class="row-value earned">+${earnedFor(choice.minutes)}</span></div></li>
-      <li><div class="row row-static"><span class="row-text">
-        <span class="row-title">Stop early</span>
-        <span class="row-sub">Hold the stop button for 10 seconds</span></span>
-        <span class="row-value is-low">−${PENALTY_MIN}</span></div></li>
-      <li><div class="row row-static"><span class="row-text">
-        <span class="row-title">Emergency passes left today</span>
-        <span class="row-sub">Stop early without the penalty</span></span>
-        <span class="row-value">${passes}</span></div></li>
-    </ul>
+    <button class="btn btn-block start-btn" data-start>Start</button>
+    <p class="muted start-note"></p>
 
     ${today.length ? `
       <h2 class="section-title">Today</h2>
@@ -446,16 +451,121 @@ function render(el) {
       }).join('')}
       </ul>` : ''}`;
 
+  // ---------- Ο τροχός ----------
+  // Κάθε λεπτό είναι μια γραμμή ύψους ITEM_H. Με scroll-snap ο browser
+  // "κουμπώνει" τη γραμμή στο κέντρο, και το scrollTop μας λέει ποια είναι:
+  // λεπτά = scrollTop / ITEM_H + 1. Το κύλισμα με την αδράνεια (momentum) το
+  // κάνει το ίδιο το iPhone, γι' αυτό νιώθει σαν τα ρολόγια του.
+  const wheel = el.querySelector('.wheel');
+  const scroller = el.querySelector('.wheel-scroll');
+  const items = [...scroller.querySelectorAll('.wheel-item')];
+  const presets = [...el.querySelectorAll('.presets .chip')];
+  const note = el.querySelector('.start-note');
+  const caption = el.querySelector('.wheel-caption');
+
+  const clamp = (m) => Math.min(MAX_MIN, Math.max(MIN_MIN, Math.round(m)));
+  const offsetFor = (m) => (m - 1) * ITEM_H;
+  let animating = false; // τρέχει δική μας κίνηση προς κάποια τιμή
+  let animId = null;
+  let frame = null;
+  let painted = [0, -1]; // ποιες γραμμές έχουν "στυλ απόστασης" αυτή τη στιγμή
+
+  // Οι γραμμές κοντά στο κέντρο είναι μεγαλύτερες και πιο έντονες
+  function paintWheel() {
+    const pos = scroller.scrollTop / ITEM_H;
+    const lo = Math.max(0, Math.floor(pos) - 3);
+    const hi = Math.min(items.length - 1, Math.ceil(pos) + 3);
+    for (let i = painted[0]; i <= painted[1]; i++) {
+      if ((i < lo || i > hi) && items[i]) items[i].style.cssText = '';
+    }
+    for (let i = lo; i <= hi; i++) {
+      const d = Math.abs(i - pos);
+      items[i].style.opacity = String(Math.max(0.18, 1 - d * 0.4));
+      items[i].style.transform = `scale(${1 - Math.min(d, 2.5) * 0.09})`;
+    }
+    painted = [lo, hi];
+  }
+
+  // Ό,τι εξαρτάται από τα λεπτά: προεπιλογές, υπότιτλος, σημείωση, προσβασιμότητα
+  function paintValue() {
+    const m = choice.minutes;
+    wheel.setAttribute('aria-valuenow', m);
+    wheel.setAttribute('aria-valuetext', `${m} minutes`);
+    presets.forEach((b) => b.classList.toggle('selected', Number(b.dataset.minutes) === m));
+    caption.textContent = m >= 60 ? hoursText(m) : '';
+    const earn = earnedFor(m);
+    note.textContent = earn
+      ? `Finish to earn ${earn} min. Stopping early costs ${PENALTY_MIN}.`
+      : 'Under 2 minutes earns nothing.';
+  }
+
+  function cancelAnim() {
+    cancelAnimationFrame(animId);
+    animating = false;
+    scroller.style.scrollSnapType = '';
+  }
+
+  // Φέρνει τον τροχό στα m λεπτά. Η κίνηση είναι "ease-out" (ξεκινάει γρήγορα,
+  // επιβραδύνει στο τέλος), όπως οι κινήσεις της Apple.
+  function goTo(m, animate = true) {
+    cancelAnim();
+    choice.minutes = clamp(m);
+    paintValue();
+    const target = offsetFor(choice.minutes);
+    const from = scroller.scrollTop;
+    const dist = target - from;
+    if (!animate || reduceMotion() || Math.abs(dist) < 1) {
+      scroller.scrollTop = target;
+      return;
+    }
+    animating = true;
+    scroller.style.scrollSnapType = 'none'; // αλλιώς το snap "τραβάει" την κίνηση
+    const t0 = performance.now();
+    const dur = Math.min(650, 300 + Math.abs(dist) * 0.1);
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      scroller.scrollTop = from + dist * (1 - (1 - p) ** 4);
+      if (p < 1) animId = requestAnimationFrame(step);
+      else cancelAnim();
+    };
+    animId = requestAnimationFrame(step);
+  }
+
+  scroller.addEventListener('scroll', () => {
+    // Η τιμή ενημερώνεται αμέσως (είναι φτηνή)...
+    if (!animating) { // όσο κινείται μόνος του, την τιμή την έχει ήδη ορίσει το goTo
+      const m = clamp(scroller.scrollTop / ITEM_H + 1);
+      if (m !== choice.minutes) { choice.minutes = m; paintValue(); }
+    }
+    // ...ενώ το μέγεθος/διαφάνεια των γραμμών ζωγραφίζεται το πολύ μία φορά ανά frame
+    if (frame) return;
+    frame = requestAnimationFrame(() => { frame = null; paintWheel(); });
+  }, { passive: true });
+
+  // Αν αγγίξεις τον τροχό όσο κινείται μόνος του, τον παίρνεις εσύ
+  ['pointerdown', 'wheel', 'touchstart'].forEach((t) => scroller.addEventListener(t, cancelAnim, { passive: true }));
+
+  // Πληκτρολόγιο: ↑/↓ ένα λεπτό, PageUp/PageDown δέκα
+  wheel.addEventListener('keydown', (e) => {
+    const move = { ArrowUp: -1, ArrowDown: 1, PageUp: -10, PageDown: 10, Home: -MAX_MIN, End: MAX_MIN }[e.key];
+    if (!move) return;
+    e.preventDefault();
+    goTo(choice.minutes + move, !e.repeat);
+  });
+
+  // Αρχική θέση, χωρίς κίνηση
+  paintValue();
+  scroller.scrollTop = offsetFor(choice.minutes);
+  paintWheel();
+
+  el.onchange = (ev) => {
+    if (ev.target.name === 'activity') choice.activity = ev.target.value;
+  };
   el.onclick = (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
-    const d = b.dataset;
-    if (d.activity) choice.activity = d.activity;
-    else if (d.step) choice.minutes = Math.min(MAX_MIN, Math.max(MIN_MIN, choice.minutes + Number(d.step)));
-    else if (d.minutes) choice.minutes = Number(d.minutes);
-    else if ('start' in d) { start(choice.activity, choice.minutes); return; }
-    else return;
-    render(el);
+    if (b.dataset.minutes) goTo(Number(b.dataset.minutes));
+    else if ('start' in b.dataset) start(choice.activity, choice.minutes);
   };
 }
 

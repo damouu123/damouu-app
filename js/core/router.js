@@ -68,7 +68,8 @@ export function ask({ title, text = '', confirmLabel = 'OK', cancelLabel = 'Canc
 
     const close = (answer) => {
       document.removeEventListener('keydown', onKey);
-      sheet.remove();
+      sheet.classList.add('closing'); // το CSS το κατεβάζει με κίνηση
+      setTimeout(() => sheet.remove(), 240);
       resolve(answer);
     };
     const onKey = (e) => { if (e.key === 'Escape') close(false); };
@@ -184,7 +185,8 @@ function route() {
 
   const el = view();
   el.innerHTML = '';
-  el.onclick = null; // καθαρίζουμε click handlers της προηγούμενης οθόνης
+  el.onclick = null; // καθαρίζουμε handlers της προηγούμενης οθόνης
+  el.onchange = null;
   // Στην Αρχική ο τίτλος είναι η μέρα της εβδομάδας
   if (mod) {
     setTitle(mod.title);
@@ -204,6 +206,11 @@ function route() {
 
   renderTabbar(id);
   window.scrollTo(0, 0);
+
+  // Ξαναπαίζουμε την κίνηση εισόδου (αφαίρεση κλάσης, "ανανέωση" διάταξης, επανάθεση)
+  el.classList.remove('enter');
+  void el.offsetWidth;
+  el.classList.add('enter');
 }
 
 export function startRouter() {
