@@ -49,6 +49,41 @@ export function toast(text) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+// Ερώτηση επιβεβαίωσης μέσα στο app (αντί για το confirm() του browser,
+// που κάποιοι browsers μπλοκάρουν σιωπηλά). Επιστρέφει Promise<true|false>.
+// Χρήση:  if (await ask({ title: 'Delete?', confirmLabel: 'Delete' })) { ... }
+export function ask({ title, text = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = true }) {
+  return new Promise((resolve) => {
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet-backdrop';
+    sheet.innerHTML = `
+      <div class="sheet" role="alertdialog" aria-modal="true" aria-labelledby="sheet-title">
+        <h2 id="sheet-title">${escapeHtml(title)}</h2>
+        ${text ? `<p class="muted">${escapeHtml(text)}</p>` : ''}
+        <div class="stack">
+          <button class="btn ${danger ? 'btn-danger' : ''} btn-block" data-answer="yes">${escapeHtml(confirmLabel)}</button>
+          <button class="btn btn-quiet btn-block" data-answer="no">${escapeHtml(cancelLabel)}</button>
+        </div>
+      </div>`;
+
+    const close = (answer) => {
+      document.removeEventListener('keydown', onKey);
+      sheet.remove();
+      resolve(answer);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') close(false); };
+
+    sheet.addEventListener('click', (e) => {
+      if (e.target === sheet) close(false); // πάτημα έξω από το παράθυρο = Cancel
+      const b = e.target.closest('[data-answer]');
+      if (b) close(b.dataset.answer === 'yes');
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(sheet);
+    sheet.querySelector('[data-answer="no"]').focus(); // η ασφαλής επιλογή έχει το focus
+  });
+}
+
 // Προσωρινή οθόνη για modules που δεν έχουν φτιαχτεί ακόμα
 export function placeholder(el, text) {
   el.innerHTML = `

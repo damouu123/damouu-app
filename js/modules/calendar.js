@@ -11,7 +11,7 @@
 
 import { register, emit } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { navigate, escapeHtml, setTitle } from '../core/router.js';
+import { navigate, escapeHtml, setTitle, ask, toast } from '../core/router.js';
 import { SEED_SCHEDULE } from '../../data/schedule.js';
 
 const store = moduleStore('calendar');
@@ -391,10 +391,18 @@ function renderEditList(el) {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.dataset.go) navigate(b.dataset.go);
-    if ('reset' in b.dataset && confirm('Replace your schedule with the original one? Attendance for classes that are not in it will stop counting.')) {
-      store.remove('schedule');
-      emit('schedule:changed');
-      renderEditList(el);
+    if ('reset' in b.dataset) {
+      ask({
+        title: 'Restore the original schedule?',
+        text: 'Your changes to the schedule are replaced. Attendance for classes that are not in the original stops counting.',
+        confirmLabel: 'Restore',
+      }).then((yes) => {
+        if (!yes) return;
+        store.remove('schedule');
+        emit('schedule:changed');
+        toast('Original schedule restored');
+        renderEditList(el);
+      });
     }
   };
 }
@@ -482,9 +490,17 @@ function renderForm(el, id) {
     const b = ev.target.closest('button');
     if (!b) return;
     if (b.dataset.go) navigate(b.dataset.go);
-    if ('delete' in b.dataset && confirm(`Delete ${e.title}? Its past attendance will stop counting toward XP.`)) {
-      saveSchedule(getSchedule().filter((x) => x.id !== id));
-      navigate('calendar/edit');
+    if ('delete' in b.dataset) {
+      ask({
+        title: `Delete ${e.title}?`,
+        text: 'Its past attendance will stop counting toward XP.',
+        confirmLabel: 'Delete',
+      }).then((yes) => {
+        if (!yes) return;
+        saveSchedule(getSchedule().filter((x) => x.id !== id));
+        toast('Class deleted');
+        navigate('calendar/edit');
+      });
     }
   };
 }

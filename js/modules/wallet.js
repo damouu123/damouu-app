@@ -15,7 +15,7 @@
 
 import { register } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { navigate, escapeHtml, toast } from '../core/router.js';
+import { navigate, escapeHtml, toast, ask } from '../core/router.js';
 import { getSessions, ACTIVITIES } from './timer.js';
 import { weekStats } from './resume.js';
 import { weekStart, addDays, dateKey, parseKey } from './calendar.js';
@@ -261,8 +261,19 @@ function render(el) {
       claim(parseKey(d.claim), Number(d.minutes));
       toast(`+${d.minutes} min weekly reward`);
     } else if (d.delete) {
-      if (!confirm('Delete this scroll entry?')) return;
-      store.update('spends', (list) => list.filter((s) => s.id !== d.delete), []);
+      // Η ερώτηση είναι "ασύγχρονη": περιμένουμε την απάντηση και μετά σβήνουμε
+      const spend = getSpends().find((s) => s.id === d.delete);
+      ask({
+        title: 'Delete this entry?',
+        text: spend ? `${spend.minutes} min on ${spend.where}. The minutes go back to your wallet.` : '',
+        confirmLabel: 'Delete',
+      }).then((yes) => {
+        if (!yes) return;
+        store.update('spends', (list) => list.filter((s) => s.id !== d.delete), []);
+        toast('Entry deleted');
+        render(el);
+      });
+      return;
     } else {
       return;
     }
