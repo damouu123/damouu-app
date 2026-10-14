@@ -128,8 +128,19 @@ function renderHome(el) {
       </li>`;
   }).join('');
 
+  // Μηνύματα της στιγμής από modules (π.χ. "Your class was cancelled")
+  const banners = mods.map((m) => {
+    try { return m.homeBanner ? m.homeBanner() : null; } catch (err) { console.error(m.id, err); return null; }
+  }).filter(Boolean).map((b) => `
+    <div class="banner" role="status">
+      <p class="banner-title">${escapeHtml(b.title)}</p>
+      <p class="banner-text">${escapeHtml(b.text)}</p>
+      ${b.action ? `<button class="btn btn-block" data-go="${escapeHtml(b.action.go)}">${escapeHtml(b.action.label)}</button>` : ''}
+    </div>`).join('');
+
   el.innerHTML = `
     <p class="subhead">${escapeHtml(date)}, week ${isoWeek(now)}</p>
+    ${banners}
     <section class="hero" id="home-hero"></section>
     <h2 class="section-title">Overview</h2>
     <ul class="list">${rows}</ul>`;

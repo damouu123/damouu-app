@@ -80,7 +80,8 @@ function atTime(date, time) {
 
 const sameDay = (a, b) => dateKey(a) === dateKey(b);
 
-function duration(min) {
+// 90 -> "1 h 30 min"
+export function duration(min) {
   const h = Math.floor(min / 60);
   const m = min % 60;
   if (!h) return `${m} min`;

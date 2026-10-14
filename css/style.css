@@ -634,6 +634,24 @@ body.locked { overflow: hidden; }
 .spend-btn { margin-top: 18px; }
 .row .btn-small { flex: none; }
 
+/* ===== Μηνύματα στην κορυφή της Αρχικής ===== */
+.banner {
+  margin: -8px 0 28px;
+  padding: 16px;
+  background: var(--surface);
+  border-left: 4px solid var(--lamp);
+  border-radius: var(--r-lg);
+}
+.banner-title { margin: 0; font-weight: 650; }
+.banner-text { margin: 4px 0 0; color: var(--muted); font-size: 15px; }
+.banner .btn { margin-top: 14px; }
+
+/* ===== Reminders ===== */
+.intro { margin: 0 0 4px; font-size: 15px; max-width: 60ch; }
+.until-field { margin: 18px 0 20px; }
+.steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 15px; max-width: 60ch; }
+.steps strong { color: var(--lamp); font-weight: 600; }
+
 /* ===== Ερώτηση επιβεβαίωσης (ask) ===== */
 .sheet-backdrop {
   position: fixed;
