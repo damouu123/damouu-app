@@ -2,25 +2,34 @@
    Ιδέα: αναλόγιο διαβάσματος το βράδυ. Ζεστό σκούρο φόντο, κείμενο σαν χαρτί,
    και κεχριμπαρένιο "φως λάμπας" μόνο για ό,τι κερδίζεις. */
 :root {
-  --bg: #1a1612;          /* σκούρο ξύλο */
-  --surface: #241f1a;     /* λίγο πιο ανοιχτό, για λίστες */
-  --surface-press: #2e2822;
-  --line: #3a322a;
-  --text: #efe7da;        /* χαρτί */
-  --muted: #a39a8c;
-  --lamp: #f0b350;        /* κεχριμπάρι: κερδισμένα λεπτά, κύρια κουμπιά */
-  --lamp-ink: #2a1d05;
-  --ink: #8fb0dc;         /* μπλε μελανιού: πανεπιστήμιο, XP */
-  --danger: #e2775c;
+  /* Παλέτα "Arcade" (UI/UX Pro Max, προφίλ Gaming): σκούρο μωβ-μπλε, βιολετί, ροζ.
+     Κάθε χρώμα έχει όνομα ΡΟΛΟΥ, ώστε να αλλάζει η παλέτα μόνο εδώ. */
+  --bg: #0F0F23;            /* φόντο */
+  --surface: #1A1930;       /* κάρτες, λίστες */
+  --surface-press: #24223F; /* πατημένη κάρτα */
+  --line: #2D2A4A;          /* διαχωριστικές γραμμές */
+  --text: #EEF0F8;
+  --muted: #A1A4C0;         /* δευτερεύον κείμενο (αντίθεση ~7:1 στο φόντο) */
+
+  --primary: #7C3AED;       /* φόντο κύριων κουμπιών (λευκό κείμενο ~5.7:1) */
+  --on-primary: #FFFFFF;
+  --accent: #A78BFA;        /* βιολετί για κείμενο/εικονίδια: επιλεγμένα, σύνδεσμοι */
+  --earn: #F0ABFC;          /* ροζ: λεπτά scroll που κέρδισες */
+  --xp: #C4B5FD;            /* λεβάντα: XP, πανεπιστήμιο */
+  --streak: #FB7185;        /* ροζ-κόκκινο: σερί */
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --danger: #FB7185;
 
   /* Καταστάσεις παρουσίας */
-  --went: var(--ink);
-  --left: #cbb07a;        /* σιτάρι: μισή επιτυχία */
+  --went: var(--success);
+  --left: var(--warning);
   --missed: var(--danger);
 
-  /* Γραμματοσειρές του iPhone: New York (serif) και SF (sans). Στα Windows πέφτει σε Georgia/Segoe. */
-  --serif: ui-serif, "New York", "Iowan Old Style", Georgia, serif;
-  --sans: system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+  /* Γραμματοσειρές: η στρογγυλεμένη του iPhone (SF Pro Rounded) για όλα.
+     Στα Windows πέφτει σε Segoe UI. */
+  --display: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
 
   --r-lg: 20px;   /* μεγάλα κομμάτια */
   --r-md: 14px;   /* κουμπιά */
@@ -60,7 +69,7 @@ button, a {
   -webkit-touch-callout: none;
 }
 
-:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 svg.icon {
   width: 24px;
@@ -93,9 +102,9 @@ svg.icon {
 .topbar .icon-btn[hidden] { display: none; }
 .topbar h1 {
   margin: 0;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 34px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 
@@ -116,9 +125,9 @@ main { padding: 0 20px 32px; }
 
 .section-title {
   margin: 36px 0 10px;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 /* ===== Κουμπιά ===== */
@@ -131,8 +140,8 @@ main { padding: 0 20px 32px; }
   padding: 0 22px;
   border: none;
   border-radius: var(--r-md);
-  background: var(--lamp);
-  color: var(--lamp-ink);
+  background: var(--primary);
+  color: var(--on-primary);
   font: inherit;
   font-weight: 650;
   cursor: pointer;
@@ -163,13 +172,13 @@ main { padding: 0 20px 32px; }
   align-items: baseline;
   gap: 10px;
   margin: 2px 0 6px;
-  font-family: var(--serif);
-  color: var(--lamp);
+  font-family: var(--display);
+  color: var(--earn);
   line-height: 1;
 }
 .hero-number strong {
   font-size: 96px;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: -0.03em;
   font-variant-numeric: lining-nums tabular-nums;
 }
@@ -202,7 +211,7 @@ main { padding: 0 20px 32px; }
 }
 .list li + li .row { border-top: 1px solid var(--line); }
 .row:active { background: var(--surface-press); }
-.row .icon { color: var(--ink); }
+.row .icon { color: var(--xp); }
 .row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .row-title { font-weight: 550; }
 .row-sub {
@@ -221,7 +230,7 @@ main { padding: 0 20px 32px; }
   font-variant-numeric: tabular-nums;
 }
 .row-value {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
@@ -251,7 +260,7 @@ main { padding: 0 20px 32px; }
   padding: 8px 4px;
   border: none;
   background: none;
-  color: var(--lamp);
+  color: var(--accent);
   font: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -291,7 +300,7 @@ main { padding: 0 20px 32px; }
   font: inherit;
   cursor: pointer;
 }
-.week-label strong { font-family: var(--serif); font-size: 20px; font-weight: 600; }
+.week-label strong { font-family: var(--display); font-size: 20px; font-weight: 700; }
 .week-label span { font-size: 14px; color: var(--muted); }
 
 /* ===== Schedule: μηνιαίο ημερολόγιο ===== */
@@ -301,9 +310,9 @@ main { padding: 0 20px 32px; }
   border: none;
   background: none;
   color: var(--text);
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 26px;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
 }
@@ -331,7 +340,7 @@ main { padding: 0 20px 32px; }
   font: inherit;
   cursor: pointer;
 }
-.mcell:focus-visible { outline: 2px solid var(--lamp); outline-offset: -2px; border-radius: 12px; }
+.mcell:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 12px; }
 .mnum {
   display: grid;
   place-items: center;
@@ -344,12 +353,12 @@ main { padding: 0 20px 32px; }
 }
 .mcell:active .mnum { transform: scale(0.88); }
 .mcell.dim { opacity: 0.35; }
-.mcell.today .mnum { color: var(--lamp); font-weight: 650; }
+.mcell.today .mnum { color: var(--accent); font-weight: 650; }
 .mcell.selected .mnum { background: var(--text); color: var(--bg); }
-.mcell.today.selected .mnum { background: var(--lamp); color: var(--lamp-ink); }
+.mcell.today.selected .mnum { background: var(--primary); color: var(--on-primary); }
 /* Μία κουκκίδα ανά μάθημα */
 .mdots { display: flex; gap: 3px; height: 6px; }
-.d { width: 6px; height: 6px; border-radius: 50%; background: rgba(163, 154, 140, 0.45); }
+.d { width: 6px; height: 6px; border-radius: 50%; background: rgba(161, 164, 192, 0.45); }
 .d.went { background: var(--went); }
 .d.left { background: var(--left); }
 .d.missed { background: var(--missed); }
@@ -370,12 +379,12 @@ main { padding: 0 20px 32px; }
   font-size: 14px;
   color: var(--muted);
 }
-.list li.gap-row.is-unexpected { color: var(--lamp); }
+.list li.gap-row.is-unexpected { color: var(--accent); }
 .empty-day { margin: 4px 0 24px; }
 .cancelled-toggle { display: block; margin: 14px 0 0; color: var(--muted); }
 .cancelled-list { margin-top: 10px; }
 .cancelled-list .row-title { text-decoration: line-through; color: var(--muted); }
-.cancelled-list .state { color: var(--lamp); }
+.cancelled-list .state { color: var(--accent); }
 .edit-btn { margin-top: 28px; }
 .sheet .choices { margin-top: 20px; }
 
@@ -425,7 +434,7 @@ main { padding: 0 20px 32px; }
   -webkit-appearance: none;
   appearance: none;
 }
-.field input:focus, .field select:focus { outline: 2px solid var(--lamp); outline-offset: 0; }
+.field input:focus, .field select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
 .segmented { display: flex; gap: 6px; padding: 4px; background: var(--surface); border-radius: 14px; }
@@ -439,8 +448,8 @@ main { padding: 0 20px 32px; }
   border-radius: 10px;
   cursor: pointer;
 }
-.segmented input:checked + span { background: var(--surface-press); color: var(--lamp); font-weight: 600; }
-.segmented input:focus-visible + span { outline: 2px solid var(--lamp); }
+.segmented input:checked + span { background: var(--surface-press); color: var(--accent); font-weight: 600; }
+.segmented input:focus-visible + span { outline: 2px solid var(--accent); }
 
 .form-error { margin: 0; color: var(--danger); }
 .form-error[hidden] { display: none; }
@@ -454,11 +463,11 @@ main { padding: 0 20px 32px; }
 .level { margin-top: 8px; }
 .level-number {
   margin: 0 0 14px;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 96px;
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1;
-  color: var(--ink);
+  color: var(--xp);
   font-variant-numeric: lining-nums tabular-nums;
 }
 .progress {
@@ -470,7 +479,7 @@ main { padding: 0 20px 32px; }
 .progress span {
   display: block;
   height: 100%;
-  background: var(--ink);
+  background: var(--xp);
   border-radius: inherit;
   transition: width 0.4s ease;
 }
@@ -481,11 +490,11 @@ main { padding: 0 20px 32px; }
   margin: 8px 0 0;
   font-size: 15px;
 }
-.xp-plus { color: var(--ink); }
+.xp-plus { color: var(--xp); }
 
 /* ===== Weekly review ===== */
 .review-hero { margin-top: 20px; }
-.hero-number.ink { color: var(--ink); }
+.hero-number.xp { color: var(--xp); }
 .is-low { color: var(--missed); }
 .icon-btn:disabled { opacity: 0.3; cursor: default; }
 
@@ -502,7 +511,7 @@ main > .segmented { margin-top: 8px; }
   margin-top: 20px;
   border-radius: var(--r-lg);
 }
-.wheel:focus-visible { outline: 2px solid var(--lamp); outline-offset: 4px; }
+.wheel:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 .wheel-lens {
   position: absolute;
   left: 0;
@@ -532,8 +541,9 @@ main > .segmented { margin-top: 8px; }
   align-items: center;
   justify-content: center;
   scroll-snap-align: center;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 34px;
+  font-weight: 600;
   font-variant-numeric: lining-nums tabular-nums;
   opacity: 0.18;
   transform: scale(0.78);
@@ -577,9 +587,9 @@ main > .segmented { margin-top: 8px; }
   align-items: baseline;
   gap: 8px;
   margin: 0;
-  font-family: var(--serif);
+  font-family: var(--display);
 }
-.duration strong { font-size: 64px; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; }
+.duration strong { font-size: 64px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
 .duration span { font-size: 22px; color: var(--muted); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -594,10 +604,10 @@ main > .segmented { margin-top: 8px; }
   font-size: 15px;
   cursor: pointer;
 }
-.chip.selected { border-color: var(--lamp); color: var(--lamp); }
+.chip.selected { border-color: var(--accent); color: var(--accent); }
 
 .small-print { margin: 14px 0 0; font-size: 14px; }
-.row-value.earned { color: var(--lamp); }
+.row-value.earned { color: var(--earn); }
 
 /* ===== Focus: κλειδωμένη οθόνη ===== */
 body.locked { overflow: hidden; }
@@ -642,7 +652,7 @@ body.locked { overflow: hidden; }
 .ring-track, .ring-bar { fill: none; stroke-width: 8; }
 .ring-track { stroke: var(--surface-press); }
 .ring-bar {
-  stroke: var(--lamp);
+  stroke: var(--accent);
   stroke-linecap: round;
   transition: stroke-dashoffset 0.3s linear;
 }
@@ -652,9 +662,9 @@ body.locked { overflow: hidden; }
   display: grid;
   place-items: center;
   margin: 0;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: clamp(44px, 14vw, 64px);
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1;
   color: var(--text);
   font-variant-numeric: lining-nums tabular-nums;
@@ -686,12 +696,12 @@ body.locked { overflow: hidden; }
 }
 .hold-label { position: relative; }
 
-.confirm h2 { margin: 0 0 10px; font-family: var(--serif); font-size: 28px; font-weight: 600; }
+.confirm h2 { margin: 0 0 10px; font-family: var(--display); font-size: 28px; font-weight: 600; }
 
 /* ===== Wallet ===== */
 .hero-actions { display: grid; grid-template-columns: 1.25fr 1fr; gap: 10px; margin-top: 18px; }
 .home-list { margin-top: 28px; }
-.reward-hint { color: var(--lamp); }
+.reward-hint { color: var(--accent); }
 .field-label { margin: 20px 0 0; font-size: 15px; color: var(--muted); }
 .other-field { margin-top: 14px; }
 .spend-btn { margin-top: 18px; }
@@ -716,13 +726,13 @@ body.locked { overflow: hidden; }
 .intro { margin: 0 0 4px; font-size: 15px; max-width: 60ch; }
 .until-field { margin: 18px 0 20px; }
 .steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 15px; max-width: 60ch; }
-.steps strong { color: var(--lamp); font-weight: 600; }
+.steps strong { color: var(--accent); font-weight: 600; }
 
 /* ===== Backup ===== */
 .backup-summary { margin: 16px 0 20px; }
 .row-sub.wrap { white-space: normal; }
 .file-btn { cursor: pointer; }
-.file-btn:focus-within { outline: 2px solid var(--lamp); outline-offset: 2px; }
+.file-btn:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* ===== Κοινά στοιχεία απλοποιημένων οθονών ===== */
 /* Μικρά νούμερα σε πλέγμα (XP, Weekly review) */
@@ -736,9 +746,9 @@ body.locked { overflow: hidden; }
   border-radius: var(--r-lg);
 }
 .stat strong {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 30px;
-  font-weight: 500;
+  font-weight: 700;
   line-height: 1.1;
   font-variant-numeric: lining-nums tabular-nums;
 }
@@ -765,7 +775,7 @@ body.locked { overflow: hidden; }
   align-items: flex-end;
   justify-content: center;
   padding: 16px 16px calc(var(--safe-bottom) + 16px);
-  background: rgba(10, 8, 6, 0.6);
+  background: rgba(5, 5, 18, 0.66);
 }
 .sheet {
   width: 100%;
@@ -775,7 +785,7 @@ body.locked { overflow: hidden; }
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
 }
-.sheet h2 { margin: 0 0 8px; font-family: var(--serif); font-size: 24px; font-weight: 600; }
+.sheet h2 { margin: 0 0 8px; font-family: var(--display); font-size: 24px; font-weight: 600; }
 .sheet p { margin: 0; }
 .sheet .stack { margin-top: 20px; }
 
@@ -846,7 +856,7 @@ body.locked { overflow: hidden; }
   display: flex;
   height: calc(var(--tabbar-h) + var(--safe-bottom));
   padding-bottom: var(--safe-bottom);
-  background: rgba(26, 22, 18, 0.94);
+  background: rgba(15, 15, 35, 0.92);
   border-top: 1px solid var(--line);
   -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
@@ -863,7 +873,7 @@ body.locked { overflow: hidden; }
   font-size: 11px;
   font-weight: 550;
 }
-.tab.active { color: var(--lamp); }
+.tab.active { color: var(--accent); }
 
 /* ===== Μήνυμα νέας έκδοσης ===== */
 .update-banner {
