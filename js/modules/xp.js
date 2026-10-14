@@ -7,7 +7,7 @@
 
 import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { navigate, escapeHtml, toast } from '../core/router.js';
+import { navigate, escapeHtml, toast, openSheet } from '../core/router.js';
 import { validAttendance, STATUSES, parseKey } from './calendar.js';
 
 const store = moduleStore('xp');
@@ -110,16 +110,33 @@ on('attendance:changed', () => {
 
 // ===================== Οθόνη =====================
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 'es'}`;
+// Φύλλο με τους κανόνες (ώστε η οθόνη να μένει καθαρή)
+function rulesSheet() {
+  const rule = (title, value, cls = 'earned') => `
+    <li><div class="row row-static"><span class="row-text"><span class="row-title">${title}</span></span>
+      <span class="row-value ${cls}">${value}</span></div></li>`;
+  openSheet(`
+    <h2>How XP works</h2>
+    <ul class="list rules-list">
+      ${rule('Went', `+${POINTS.attended}`)}
+      ${rule('Left early', `+${POINTS.left}`)}
+      ${rule('Missed', '0', 'muted')}
+      ${rule('Cancelled', 'Not counted', 'muted')}
+    </ul>
+    <p class="muted small-print">Your streak counts classes in a row without a miss. Leaving early keeps it, missing one resets it.</p>
+    <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
+  (root, close) => root.querySelector('[data-close]').addEventListener('click', close));
+}
 
 function render(el) {
   const xp = getXp();
   const span = xp.to - xp.from;
   const pct = Math.round(((xp.total - xp.from) / span) * 100);
-  const recent = xp.records.slice(-10).reverse();
+  const recent = xp.records.slice(-5).reverse();
 
   const history = recent.length
-    ? `<ul class="list">${recent.map((r) => {
+    ? `<h2 class="section-title">Recent</h2>
+       <ul class="list">${recent.map((r) => {
       const day = parseKey(r.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
       const pts = pointsFor(r.status);
       return `
@@ -131,10 +148,8 @@ function render(el) {
           <span class="row-value ${pts ? 'xp-plus' : 'muted'}">${pts ? `+${pts}` : '0'}</span>
         </div></li>`;
     }).join('')}</ul>`
-    : `<div class="placeholder">
-        <p>Mark your first class to start earning XP.</p>
-        <button class="btn btn-block" data-go="calendar" style="margin-top:14px">Open schedule</button>
-      </div>`;
+    : `<p class="muted empty-day">Mark your first class to start earning XP.</p>
+       <button class="btn btn-block" data-go="calendar">Open schedule</button>`;
 
   el.innerHTML = `
     <section class="level">
@@ -145,45 +160,23 @@ function render(el) {
       </div>
       <p class="level-caption">
         <span>${xp.total} XP</span>
-        <span class="muted">${xp.to - xp.total} XP to level ${xp.level + 1}</span>
+        <span class="muted">${xp.to - xp.total} to level ${xp.level + 1}</span>
       </p>
     </section>
 
-    <h2 class="section-title">Streak</h2>
-    <ul class="list">
-      <li><div class="row row-static">
-        <span class="row-text"><span class="row-title">Current</span>
-          <span class="row-sub">Classes in a row without missing one</span></span>
-        <span class="row-value">${xp.streak}</span>
-      </div></li>
-      <li><div class="row row-static">
-        <span class="row-text"><span class="row-title">Best</span>
-          <span class="row-sub">${plural(xp.bestStreak, 'class')}</span></span>
-        <span class="row-value">${xp.bestStreak}</span>
-      </div></li>
-    </ul>
+    <div class="stats">
+      <div class="stat"><strong>${xp.streak}</strong><span>Streak</span></div>
+      <div class="stat"><strong>${xp.bestStreak}</strong><span>Best streak</span></div>
+    </div>
 
-    <h2 class="section-title">How you earn XP</h2>
-    <ul class="list">
-      <li><div class="row row-static"><span class="row-text"><span class="row-title">Went</span></span>
-        <span class="row-value xp-plus">+${POINTS.attended}</span></div></li>
-      <li><div class="row row-static"><span class="row-text"><span class="row-title">Left early</span>
-        <span class="row-sub">Still keeps your streak</span></span>
-        <span class="row-value xp-plus">+${POINTS.left}</span></div></li>
-      <li><div class="row row-static"><span class="row-text"><span class="row-title">Missed</span>
-        <span class="row-sub">Resets your streak</span></span>
-        <span class="row-value muted">0</span></div></li>
-      <li><div class="row row-static"><span class="row-text"><span class="row-title">Cancelled</span>
-        <span class="row-sub">Doesn't count either way</span></span>
-        <span class="row-value muted">–</span></div></li>
-    </ul>
-
-    <h2 class="section-title">Recent</h2>
-    ${history}`;
+    ${history}
+    <button class="link-btn" data-rules>How XP works</button>`;
 
   el.onclick = (ev) => {
-    const b = ev.target.closest('[data-go]');
-    if (b) navigate(b.dataset.go);
+    const b = ev.target.closest('button');
+    if (!b) return;
+    if (b.dataset.go) navigate(b.dataset.go);
+    else if ('rules' in b.dataset) rulesSheet();
   };
 }
 

@@ -62,32 +62,17 @@ export function weekStats(ws) {
 
 const pct = (rate) => Math.round(rate * 100);
 
-// "12 points more than last week" κ.λπ.
-function compareRate(now, prev) {
-  if (now.rate === null) return '';
-  if (prev.rate === null) return 'No marked classes last week to compare with.';
-  const diff = pct(now.rate) - pct(prev.rate);
-  if (diff === 0) return 'Same as last week.';
-  const pts = Math.abs(diff) === 1 ? 'point' : 'points';
-  return diff > 0
-    ? `${diff} ${pts} more than last week.`
-    : `${-diff} ${pts} less than last week.`;
-}
-
 // ===================== Οθόνη =====================
 
-let ws = null; // η Δευτέρα της εβδομάδας που βλέπουμε
-
-function row(title, sub, value, valueClass = '') {
-  return `
-    <li><div class="row row-static">
-      <span class="row-text">
-        <span class="row-title">${title}</span>
-        ${sub ? `<span class="row-sub">${sub}</span>` : ''}
-      </span>
-      <span class="row-value ${valueClass}">${value}</span>
-    </div></li>`;
+// Σύγκριση σε μία σύντομη φράση: "+25 vs last week"
+function compareText(now, prev) {
+  if (now.rate === null || prev.rate === null) return '';
+  const diff = pct(now.rate) - pct(prev.rate);
+  if (diff === 0) return 'same as last week';
+  return `${diff > 0 ? '+' : '−'}${Math.abs(diff)} vs last week`;
 }
+
+let ws = null; // η Δευτέρα της εβδομάδας που βλέπουμε
 
 function render(el) {
   if (!ws) ws = weekStart(new Date());
@@ -95,37 +80,36 @@ function render(el) {
   const s = weekStats(ws);
   const p = weekStats(addDays(ws, -7));
   const { range, rel } = weekHeading([ws, addDays(ws, 4)]);
-
-  const xpDiff = s.xp - p.xp;
-  const xpSub = p.counted ? `Last week: ${p.xp} XP` : '';
-  const missedSub = p.counted ? `Last week: ${p.missed}` : '';
+  const went = s.attended + s.left; // "πήγες" = Went + Left early (εμφανίστηκες)
 
   const hero = s.rate === null
     ? `<p class="hero-label">Attendance</p>
        <p class="hero-number ink"><strong>–</strong></p>
-       <p class="hero-hint">No classes marked this week yet.</p>`
+       <p class="hero-hint">No classes marked yet.</p>`
     : `<p class="hero-label">Attendance</p>
        <p class="hero-number ink"><strong>${pct(s.rate)}</strong><span>%</span></p>
-       <p class="hero-hint">
-         You showed up to ${s.attended + s.left} of ${s.counted} ${s.counted === 1 ? 'class' : 'classes'}.
-         ${compareRate(s, p)}
-       </p>`;
+       <p class="hero-hint">${went} of ${s.counted} ${s.counted === 1 ? 'class' : 'classes'}${compareText(s, p) ? `, ${compareText(s, p)}` : ''}</p>`;
 
   const reminder = s.unmarked
-    ? `<div class="notice">
-         <p>${s.unmarked} ${s.unmarked === 1 ? 'class this week isn\'t' : 'classes this week aren\'t'} marked yet, so ${s.unmarked === 1 ? 'it doesn\'t' : 'they don\'t'} count.</p>
-         <button class="btn btn-quiet btn-block" data-go="calendar">Mark them in Schedule</button>
+    ? `<div class="banner" role="status">
+         <div class="banner-body">
+           <p class="banner-title">${s.unmarked} ${s.unmarked === 1 ? 'class' : 'classes'} to mark</p>
+           <p class="banner-text">Unmarked classes don't count.</p>
+         </div>
+         <button class="btn btn-small" data-go="calendar">Mark</button>
        </div>`
     : '';
 
   const courses = s.courses.length
     ? `<h2 class="section-title">By course</h2>
-       <ul class="list">${s.courses.map((c) => row(
-        escapeHtml(c.title),
-        `${c.shown} of ${c.total}`,
-        `${pct(c.shown / c.total)}%`,
-        c.shown < c.total ? 'is-low' : '',
-      )).join('')}</ul>`
+       <ul class="list">${s.courses.map((c) => `
+        <li><div class="row row-static">
+          <span class="row-text">
+            <span class="row-title">${escapeHtml(c.title)}</span>
+            <span class="row-sub">${c.shown} of ${c.total}</span>
+          </span>
+          <span class="row-value ${c.shown < c.total ? 'is-low' : ''}">${pct(c.shown / c.total)}%</span>
+        </div></li>`).join('')}</ul>`
     : '';
 
   el.innerHTML = `
@@ -140,23 +124,12 @@ function render(el) {
     <section class="hero review-hero">${hero}</section>
     ${reminder}
 
-    <h2 class="section-title">This week in numbers</h2>
-    <ul class="list">
-      ${row('Went', '', s.attended)}
-      ${row('Left early', '', s.left)}
-      ${row('Missed', missedSub, s.missed, s.missed ? 'is-low' : '')}
-      ${row('Cancelled', 'Not counted', s.cancelled, 'muted')}
-      ${row('XP earned', xpSub, `+${s.xp}`, 'xp-plus')}
-      ${p.counted && xpDiff !== 0
-        ? row(
-          'Compared with last week',
-          isCurrent ? 'This week isn\'t over yet' : '',
-          `${xpDiff > 0 ? '+' : ''}${xpDiff} XP`,
-          xpDiff < 0 ? 'is-low' : 'xp-plus',
-        )
-        : ''}
-      ${row('Streak', isCurrent ? 'Classes in a row right now' : 'At the end of this week', s.streak)}
-    </ul>
+    <div class="stats">
+      <div class="stat"><strong>${went}</strong><span>Went</span></div>
+      <div class="stat"><strong class="${s.missed ? 'is-low' : ''}">${s.missed}</strong><span>Missed</span></div>
+      <div class="stat"><strong class="xp-plus">+${s.xp}</strong><span>XP</span></div>
+      <div class="stat"><strong>${s.streak}</strong><span>Streak</span></div>
+    </div>
 
     ${courses}`;
 

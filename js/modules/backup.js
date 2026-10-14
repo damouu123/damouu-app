@@ -160,35 +160,24 @@ function render(el) {
   const safety = getSafetyCopy();
 
   el.innerHTML = `
-    <h2 class="section-title first">Save a backup</h2>
-    <p class="muted intro">Your data lives only on this phone. If the app is removed from your Home Screen,
-      it's gone. A backup is a small file you keep in Files or iCloud Drive.</p>
+    <p class="muted intro first-intro">Your data lives only on this phone. Save a copy to Files or iCloud Drive.</p>
+
     <ul class="list backup-summary">
       <li><div class="row row-static"><span class="row-text">
-        <span class="row-title">In the app now</span>
-        <span class="row-sub wrap">${escapeHtml(summaryText(current))}</span></span></div></li>
-      <li><div class="row row-static"><span class="row-text">
-        <span class="row-title">Last backup</span>
-        <span class="row-sub">${last ? ago(last) : 'Never'}</span></span></div></li>
+        <span class="row-title">Your data</span>
+        <span class="row-sub wrap">${escapeHtml(summaryText(current))}</span></span>
+        <span class="row-value small-value ${last ? '' : 'is-low'}">${last ? `Saved ${ago(last)}` : 'Not saved'}</span></div></li>
     </ul>
-    <div class="stack">
-      <button class="btn btn-block" data-export>Save backup</button>
-      <button class="btn btn-quiet btn-block" data-download>Download the file instead</button>
-    </div>
-    <p class="muted small-print">On iPhone, choose <strong>Save to Files</strong> and pick iCloud Drive,
-      so the backup survives even if you lose the phone.</p>
 
-    <h2 class="section-title">Restore from a backup</h2>
-    <p class="muted intro">Pick a backup file. You'll see what's in it before anything changes.</p>
+    <button class="btn btn-block" data-export>Save backup</button>
+    <button class="link-btn centered" data-download>Download the file instead</button>
+
+    <h2 class="section-title">Restore</h2>
     <label class="btn btn-quiet btn-block file-btn">
       Choose backup file
       <input type="file" id="backup-file" accept="application/json,.json" hidden>
     </label>
-
-    ${safety ? `
-      <h2 class="section-title">Undo</h2>
-      <p class="muted intro">You restored a backup ${ago(safety.at)}. You can go back to the data you had before it.</p>
-      <button class="btn btn-quiet btn-block" data-undo>Undo the last restore</button>` : ''}`;
+    ${safety ? `<button class="link-btn centered" data-undo>Undo the last restore (${ago(safety.at)})</button>` : ''}`;
 
   el.querySelector('#backup-file').addEventListener('change', (ev) => {
     const file = ev.target.files && ev.target.files[0];
@@ -215,6 +204,7 @@ register({
   title: 'Backup',
   icon: '<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 15.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/>',
   order: 70,
+  settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
 
   homeCard() {
     const last = store.get('lastExport', null);
@@ -228,8 +218,8 @@ register({
     if (!hasData(summarize(exportAll()))) return null;
     return {
       title: last ? `Last backup was ${ago(last)}` : 'Back up your data',
-      text: 'Your data lives only on this phone. Save a copy to Files or iCloud Drive.',
-      action: { go: 'backup', label: 'Open Backup' },
+      text: 'Your data lives only on this phone.',
+      action: { go: 'backup', label: 'Back up' },
     };
   },
 

@@ -16,7 +16,7 @@
 
 import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { navigate, toast, ask } from '../core/router.js';
+import { navigate, toast, ask, openSheet } from '../core/router.js';
 import {
   getSchedule, entriesForDate, gapsForDate, startOfDay, addDays, weekday, dateKey, parseKey,
   toMin, fromMin, duration,
@@ -168,46 +168,16 @@ on('attendance:changed', ({ date, id, status }) => {
 
 // ===================== Οθόνη =====================
 
-function render(el) {
-  const s = getSettings();
-  const exported = store.get('exported', null);
-  const classes = getSchedule().length;
-  const untilLabel = parseKey(s.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-
-  el.innerHTML = `
-    <h2 class="section-title first">Lecture reminders</h2>
-    <p class="muted intro">Add your ${classes} weekly classes to the iPhone Calendar with an alert before each one.
-      The alerts come from the Calendar app, so they work even when this app is closed.</p>
-
-    <p class="field-label">Alert me</p>
-    <div class="chips">
-      ${LEADS.map((m) => `<button class="chip ${s.lead === m ? 'selected' : ''}" data-lead="${m}">${m} min before</button>`).join('')}
-    </div>
-
-    <label class="field until-field"><span>Repeat every week until</span>
-      <input type="date" id="until" value="${s.until}" min="${dateKey(new Date())}"></label>
-
-    <div class="stack">
-      <button class="btn btn-block" data-download>Add to Calendar</button>
-      <button class="btn btn-quiet btn-block" data-share>Share the file instead</button>
-    </div>
-    ${exported ? `<p class="muted small-print">Last created ${new Date(exported.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })},
-      ${exported.lead} min before, until ${parseKey(exported.until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}.</p>` : ''}
-
-    <h2 class="section-title">How to add it on iPhone</h2>
+// Φύλλο: οδηγίες και τι είναι αξιόπιστο στο iPhone (ώστε η οθόνη να μένει καθαρή)
+function infoSheet() {
+  openSheet(`
+    <h2>How reminders work</h2>
     <ol class="steps">
-      <li>Tap <strong>Add to Calendar</strong>. If iPhone asks, choose to open or add the events.</li>
-      <li>Pick a calendar for them. A new one called "Lectures" makes it easy to remove them later.</li>
-      <li>If nothing opens, tap <strong>Share the file instead</strong>, save it to Files, then open it from Files.</li>
+      <li>Tap <strong>Add to Calendar</strong> and choose to add the events.</li>
+      <li>Pick a calendar for them. A new one called "Lectures" is easy to remove later.</li>
+      <li>If nothing opens, use <strong>Share the file instead</strong>, save it to Files, then open it from there.</li>
     </ol>
-    <p class="muted small-print">Changed your schedule? Delete the old events (or the whole "Lectures" calendar) and add the file again, so you don't get double alerts. Classes repeat until ${untilLabel}.</p>
-
-    <h2 class="section-title">Breaks</h2>
-    <p class="muted intro">When you open the app during a free gap between classes, Today shows how long your break is
-      and offers a focus session. When you mark a class as cancelled, the app tells you about the free time it creates.</p>
-
-    <h2 class="section-title">What works on iPhone</h2>
-    <ul class="list">
+    <ul class="list rules-list">
       <li><div class="row row-static"><span class="row-text">
         <span class="row-title">Calendar alerts</span>
         <span class="row-sub">Arrive even when the app is closed</span></span>
@@ -216,31 +186,52 @@ function render(el) {
         <span class="row-title">Break messages</span>
         <span class="row-sub">Only when you open the app</span></span>
         <span class="row-value">In app</span></div></li>
-      <li><div class="row row-static"><span class="row-text">
-        <span class="row-title">Push notifications</span>
-        <span class="row-sub">Need a server, which this app doesn't have</span></span>
-        <span class="row-value muted">Not used</span></div></li>
-    </ul>`;
+    </ul>
+    <p class="muted small-print">Changed your schedule? Delete the old events, or the whole "Lectures" calendar, and add the file again so you don't get double alerts.</p>
+    <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
+  (root, close) => root.querySelector('[data-close]').addEventListener('click', close));
+}
+
+function render(el) {
+  const s = getSettings();
+  const exported = store.get('exported', null);
+  const short = (ts) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+  el.innerHTML = `
+    <p class="muted intro first-intro">Get an alert from your iPhone Calendar before each class. It works even when this app is closed.</p>
+
+    <p class="field-label">Minutes before class</p>
+    <div class="segmented lead-seg" role="radiogroup" aria-label="Minutes before class">
+      ${LEADS.map((m) => `
+        <label><input type="radio" name="lead" value="${m}" ${s.lead === m ? 'checked' : ''}><span>${m}</span></label>`).join('')}
+    </div>
+
+    <label class="field until-field"><span>Repeat every week until</span>
+      <input type="date" id="until" value="${s.until}" min="${dateKey(new Date())}"></label>
+
+    <button class="btn btn-block" data-download>Add to Calendar</button>
+    <button class="link-btn centered" data-share>Share the file instead</button>
+    ${exported ? `<p class="muted small-print centered">Last added ${short(exported.at)}, ${exported.lead} min before.</p>` : ''}
+    <button class="link-btn centered" data-info>How it works</button>`;
 
   const saveSettings = (patch) => store.set('settings', { ...getSettings(), ...patch });
 
   el.querySelector('#until').addEventListener('change', (ev) => {
     if (ev.target.value) saveSettings({ until: ev.target.value });
   });
+  el.onchange = (ev) => {
+    if (ev.target.name === 'lead') saveSettings({ lead: Number(ev.target.value) });
+  };
 
   el.onclick = async (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
-    if (b.dataset.lead) {
-      saveSettings({ lead: Number(b.dataset.lead) });
-      render(el);
-      return;
-    }
+    if ('info' in b.dataset) { infoSheet(); return; }
     if ('download' in b.dataset || 'share' in b.dataset) {
       const settings = getSettings();
       if ('share' in b.dataset) {
         const ok = await share(settings);
-        if (!ok) { download(settings); }
+        if (!ok) download(settings);
       } else {
         download(settings);
       }
@@ -258,12 +249,11 @@ register({
   title: 'Reminders',
   icon: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/>',
   order: 60,
+  settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
 
   homeCard() {
     const exported = store.get('exported', null);
-    return exported
-      ? { value: '', label: `Calendar alerts ${exported.lead} min before class` }
-      : { value: '', label: 'Set up lecture alerts' };
+    return { value: '', label: exported ? `Alerts ${exported.lead} min before class` : 'Not set up yet' };
   },
 
   // Μήνυμα στην κορυφή της Αρχικής: διάλειμμα τώρα ή μάθημα σε λίγο
@@ -274,8 +264,8 @@ register({
     if (gap && breakLeft >= MIN_BREAK_LEFT) {
       return {
         title: gap.unexpected ? 'Your class was cancelled' : 'You have a break',
-        text: `You're free until ${fromMin(gap.end)} (${duration(breakLeft)}). Use it for a focus session?`,
-        action: { go: 'timer', label: 'Start focusing' },
+        text: `Free until ${fromMin(gap.end)}, ${duration(breakLeft)}.`,
+        action: { go: 'timer', label: 'Focus' },
       };
     }
     if (next && next.startsAt - now <= SOON_MIN * 60000) {

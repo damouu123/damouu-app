@@ -122,6 +122,24 @@ function isoWeek(date) {
   return Math.ceil(((d - yearStart) / 86400000 + 1) / 7);
 }
 
+// Μία γραμμή λίστας για ένα module (εικονίδιο, τίτλος, υπότιτλος, τιμή)
+function moduleRow(m) {
+  let info = {};
+  try { info = m.homeCard ? m.homeCard() || {} : {}; } catch (err) { console.error(m.id, err); }
+  return `
+    <li>
+      <button class="row" data-go="${escapeHtml(m.id)}">
+        ${icon(m.icon)}
+        <span class="row-text">
+          <span class="row-title">${escapeHtml(m.title)}</span>
+          <span class="row-sub">${escapeHtml(info.label ?? '')}</span>
+        </span>
+        <span class="row-value">${escapeHtml(info.value ?? '')}</span>
+        <span class="row-chevron" aria-hidden="true">›</span>
+      </button>
+    </li>`;
+}
+
 function renderHome(el) {
   const now = new Date();
   const date = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
@@ -129,46 +147,44 @@ function renderHome(el) {
 
   // Ένα module μπορεί να "πάρει" την κορυφή της Αρχικής (το πορτοφόλι)
   const heroMod = mods.find((m) => m.renderHomeHero);
-  const listMods = mods.filter((m) => m !== heroMod);
+  // Στη λίστα μπαίνουν όσα κοιτάς καθημερινά. Τα σπάνια (settings: true) πάνε στις
+  // Ρυθμίσεις, και όσα έχουν home: false έχουν ήδη δικό τους κουμπί/καρτέλα.
+  const listMods = mods.filter((m) => m !== heroMod && !m.settings && m.home !== false);
 
-  const rows = listMods.map((m) => {
-    let info = {};
-    try { info = m.homeCard ? m.homeCard() || {} : {}; } catch (err) { console.error(m.id, err); }
-    return `
-      <li>
-        <button class="row" data-go="${escapeHtml(m.id)}">
-          ${icon(m.icon)}
-          <span class="row-text">
-            <span class="row-title">${escapeHtml(m.title)}</span>
-            <span class="row-sub">${escapeHtml(info.label ?? '')}</span>
-          </span>
-          <span class="row-value">${escapeHtml(info.value ?? '')}</span>
-          <span class="row-chevron" aria-hidden="true">›</span>
-        </button>
-      </li>`;
-  }).join('');
-
-  // Μηνύματα της στιγμής από modules (π.χ. "Your class was cancelled")
-  const banners = mods.map((m) => {
-    try { return m.homeBanner ? m.homeBanner() : null; } catch (err) { console.error(m.id, err); return null; }
-  }).filter(Boolean).map((b) => `
-    <div class="banner" role="status">
-      <p class="banner-title">${escapeHtml(b.title)}</p>
-      <p class="banner-text">${escapeHtml(b.text)}</p>
-      ${b.action ? `<button class="btn btn-block" data-go="${escapeHtml(b.action.go)}">${escapeHtml(b.action.label)}</button>` : ''}
-    </div>`).join('');
+  // Μήνυμα της στιγμής από module (π.χ. "Your class was cancelled").
+  // Δείχνουμε ΜΟΝΟ το πρώτο, για να μη γεμίζει η κορυφή.
+  let banner = null;
+  for (const m of mods) {
+    try { banner = m.homeBanner ? m.homeBanner() : null; } catch (err) { console.error(m.id, err); }
+    if (banner) break;
+  }
 
   el.innerHTML = `
-    <p class="subhead">${escapeHtml(date)}, week ${isoWeek(now)}</p>
-    ${banners}
+    <p class="subhead">${escapeHtml(date)}</p>
+    ${banner ? `
+      <div class="banner" role="status">
+        <div class="banner-body">
+          <p class="banner-title">${escapeHtml(banner.title)}</p>
+          <p class="banner-text">${escapeHtml(banner.text)}</p>
+        </div>
+        ${banner.action ? `<button class="btn btn-small" data-go="${escapeHtml(banner.action.go)}">${escapeHtml(banner.action.label)}</button>` : ''}
+      </div>` : ''}
     <section class="hero" id="home-hero"></section>
-    <h2 class="section-title">Overview</h2>
-    <ul class="list">${rows}</ul>`;
+    <ul class="list home-list">${listMods.map(moduleRow).join('')}</ul>`;
 
   if (heroMod) {
     try { heroMod.renderHomeHero(el.querySelector('#home-hero')); } catch (err) { console.error(err); }
   }
 
+  el.querySelectorAll('[data-go]').forEach((btn) => {
+    btn.addEventListener('click', () => navigate(btn.dataset.go));
+  });
+}
+
+// Οθόνη Ρυθμίσεων: τα modules που χρησιμοποιείς σπάνια
+function renderSettings(el) {
+  const mods = allModules().filter((m) => m.settings);
+  el.innerHTML = `<ul class="list">${mods.map(moduleRow).join('')}</ul>`;
   el.querySelectorAll('[data-go]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.go));
   });
@@ -190,10 +206,11 @@ function route() {
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
   const id = parts[0] || 'home';
   const params = parts.slice(1);
-  const mod = id === 'home' ? null : getModule(id);
+  const builtin = id === 'home' || id === 'settings'; // οθόνες του ίδιου του router
+  const mod = builtin ? null : getModule(id);
 
-  // Αν η διεύθυνση δεν αντιστοιχεί σε module, πάμε στην Αρχική
-  if (id !== 'home' && !mod) { navigate('home'); return; }
+  // Αν η διεύθυνση δεν αντιστοιχεί σε οθόνη, πάμε στην Αρχική
+  if (!builtin && !mod) { navigate('home'); return; }
 
   // Όταν φεύγουμε από ένα module (όχι απλώς αλλάζουμε υπο-οθόνη του),
   // του δίνουμε την ευκαιρία να καθαρίσει (π.χ. timers)
@@ -209,16 +226,24 @@ function route() {
   // Στην Αρχική ο τίτλος είναι η μέρα της εβδομάδας
   if (mod) {
     setTitle(mod.title);
+  } else if (id === 'settings') {
+    setTitle('Settings');
   } else {
     document.getElementById('page-title').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
     document.title = 'Discipline';
   }
+
+  // Γρανάζι ρυθμίσεων μόνο στην Αρχική, "‹ Settings" μόνο σε οθόνες των Ρυθμίσεων
+  document.getElementById('settings-link').hidden = id !== 'home';
+  document.getElementById('back-link').hidden = !(mod && mod.settings && !params.length);
 
   if (mod) {
     try { mod.render(el, params); } catch (err) {
       console.error(err);
       el.innerHTML = '<div class="placeholder"><p>This screen failed to load. Go back to Today and try again.</p></div>';
     }
+  } else if (id === 'settings') {
+    renderSettings(el);
   } else {
     renderHome(el);
   }

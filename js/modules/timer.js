@@ -577,12 +577,7 @@ register({
   icon: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.5 2M9.5 2.5h5"/>',
   order: 40,
   nav: true,
-  homeCard() {
-    const minutes = todaySessions().filter((s) => s.completed).reduce((sum, s) => sum + s.minutes, 0);
-    return minutes
-      ? { value: `${minutes} min`, label: 'Focused today' }
-      : { value: '', label: 'Study, read or work out' };
-  },
+  home: false, // ήδη στην κάτω μπάρα και στο κουμπί της Αρχικής: όχι και γραμμή στη λίστα
   render,
 });
 
