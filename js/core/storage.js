@@ -45,7 +45,7 @@ export function moduleStore(moduleId) {
   };
 }
 
-// Όλα τα δεδομένα του app μαζί (για μελλοντικό backup/επαναφορά)
+// Όλα τα δεδομένα του app μαζί (για backup): { "ud:calendar:schedule": "<json>", ... }
 export function exportAll() {
   const out = {};
   try {
@@ -55,6 +55,34 @@ export function exportAll() {
     }
   } catch { /* αγνοούμε */ }
   return out;
+}
+
+// Αντικαθιστά ΟΛΑ τα δεδομένα του app με αυτά του map (επαναφορά backup).
+// Σβήνει πρώτα τα τωρινά, ώστε να μη μείνουν "ανακατεμένα" παλιά και νέα.
+export function replaceAll(map) {
+  const old = Object.keys(exportAll());
+  old.forEach((k) => localStorage.removeItem(k));
+  Object.entries(map).forEach(([k, v]) => {
+    if (k.startsWith(PREFIX) && typeof v === 'string') localStorage.setItem(k, v);
+  });
+}
+
+// Ένα κλειδί ΕΚΤΟΣ του ud: (για να μη μπαίνει μέσα στα backups),
+// όπου κρατάμε τα δεδομένα όπως ήταν πριν από την τελευταία επαναφορά.
+const SAFETY_KEY = 'udsafety:beforeImport';
+
+export function saveSafetyCopy() {
+  try {
+    localStorage.setItem(SAFETY_KEY, JSON.stringify({ at: Date.now(), data: exportAll() }));
+  } catch { /* αν δεν χωράει, απλώς δεν κρατάμε αντίγραφο */ }
+}
+
+export function getSafetyCopy() {
+  try { return JSON.parse(localStorage.getItem(SAFETY_KEY)); } catch { return null; }
+}
+
+export function clearSafetyCopy() {
+  try { localStorage.removeItem(SAFETY_KEY); } catch { /* τίποτα */ }
 }
 
 // Ζητάμε από τον browser να μη σβήσει τα δεδομένα όταν χρειάζεται χώρο

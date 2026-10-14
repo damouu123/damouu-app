@@ -652,6 +652,12 @@ body.locked { overflow: hidden; }
 .steps { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 15px; max-width: 60ch; }
 .steps strong { color: var(--lamp); font-weight: 600; }
 
+/* ===== Backup ===== */
+.backup-summary { margin: 16px 0 20px; }
+.row-sub.wrap { white-space: normal; }
+.file-btn { cursor: pointer; }
+.file-btn:focus-within { outline: 2px solid var(--lamp); outline-offset: 2px; }
+
 /* ===== Ερώτηση επιβεβαίωσης (ask) ===== */
 .sheet-backdrop {
   position: fixed;
