@@ -149,11 +149,9 @@ export function openDayView(startDate, afterClose) {
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
       root.innerHTML = `
-        <div class="dv-head">
-          <button class="icon-btn" data-step="-1" aria-label="Previous day">‹</button>
+        <div class="dv-head" aria-label="Drag down to close">
+          <span class="dv-grab" aria-hidden="true"></span>
           <div class="dv-title"><strong>${dayTitle(day)}</strong><span>${summary(events)}</span></div>
-          <button class="icon-btn" data-step="1" aria-label="Next day">›</button>
-          <button class="icon-btn dv-close" data-close aria-label="Close">×</button>
         </div>
         ${legend()}
         <div class="dv-body ${slide}">
@@ -163,6 +161,12 @@ export function openDayView(startDate, afterClose) {
             <div class="dv-events">${events.map(eventHtml).join('')}</div>
             ${isToday ? `<div class="dv-now" style="top:${px(nowMin)}px"><i></i></div>` : ''}
           </div>
+        </div>
+        <div class="dv-bar">
+          <button class="dv-nav" data-step="-1" aria-label="Previous day">‹</button>
+          <button class="dv-today" data-today ${isToday ? 'disabled' : ''}>Today</button>
+          <button class="dv-nav" data-step="1" aria-label="Next day">›</button>
+          <button class="dv-done" data-close>Done</button>
         </div>`;
 
       const body = root.querySelector('.dv-body');
@@ -170,15 +174,59 @@ export function openDayView(startDate, afterClose) {
     };
     paint();
 
+    // Αλλαγή μέρας (κουμπιά ή σύρσιμο)
+    const go = (step) => {
+      day = addDays(day, step);
+      paint(step > 0 ? 'slide-next' : 'slide-prev');
+    };
+
+    // ----- Χειρονομίες -----
+    // Σύρσιμο προς τα κάτω από την κορυφή: το φύλλο ακολουθεί το δάχτυλο και κλείνει
+    // αν το τραβήξεις αρκετά, αλλιώς γυρνάει στη θέση του.
+    let dragY = null;
+    let swipe = null; // { x, y } αρχή αγγίγματος πάνω στο χρονοδιάγραμμα
+    root.addEventListener('pointerdown', (ev) => {
+      if (ev.target.closest('.dv-head')) {
+        dragY = ev.clientY;
+        root.style.transition = 'none';
+        root.setPointerCapture?.(ev.pointerId);
+      } else if (ev.target.closest('.dv-body')) {
+        swipe = { x: ev.clientX, y: ev.clientY };
+      }
+    });
+    root.addEventListener('pointermove', (ev) => {
+      if (dragY === null) return;
+      root.style.transform = `translateY(${Math.max(0, ev.clientY - dragY)}px)`;
+    });
+    const endDrag = (ev) => {
+      if (dragY !== null) {
+        const dy = ev.clientY - dragY;
+        dragY = null;
+        root.style.transition = 'transform 0.35s var(--ease)';
+        if (dy > 90) close(); else root.style.transform = '';
+      }
+      if (swipe) {
+        const dx = ev.clientX - swipe.x;
+        const dy = ev.clientY - swipe.y;
+        swipe = null;
+        // Οριζόντιο σύρσιμο (όχι κύλιση προς τα πάνω/κάτω)
+        if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy) * 2) go(dx < 0 ? 1 : -1);
+      }
+    };
+    root.addEventListener('pointerup', endDrag);
+    root.addEventListener('pointercancel', () => { dragY = null; swipe = null; root.style.transform = ''; });
+
     root.addEventListener('click', (ev) => {
       const b = ev.target.closest('button');
       if (!b) return;
       const d = b.dataset;
       if ('close' in d) { close(); return; }
-      if (d.step) {
-        const step = Number(d.step);
-        day = addDays(day, step);
-        paint(step > 0 ? 'slide-next' : 'slide-prev');
+      if (d.step) { go(Number(d.step)); return; }
+      if ('today' in d) {
+        const today = startOfDay(new Date());
+        const dir = today > day ? 1 : -1;
+        day = today;
+        paint(dir > 0 ? 'slide-next' : 'slide-prev');
         return;
       }
       if (d.ev !== undefined) {
