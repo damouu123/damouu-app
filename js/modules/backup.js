@@ -10,6 +10,8 @@
 // Δεδομένα (moduleStore('backup')):
 //   lastExport  πότε έκανες τελευταία φορά backup (ms)
 //
+// CLOUD BACKUP: δες την ενότητα "Cloud backup (GitHub Gist)" πιο κάτω.
+//
 // ΑΥΤΟΜΑΤΟ BACKUP: ένα web app δεν μπορεί να γράψει αρχείο στα Files μόνο του
 // (θέλει πάντα το δικό σου πάτημα). Γι' αυτό, μία φορά τη μέρα, κρατάμε ένα
 // αντίγραφο ΜΕΣΑ στο app (τελευταίες 7 μέρες). Σε προστατεύει από λάθη, αλλά
@@ -201,6 +203,173 @@ async function restoreSnapshot(date) {
   location.reload();
 }
 
+// ===================== Cloud backup (GitHub Gist) =====================
+//
+// Αντίγραφο ΕΞΩ από το κινητό: ένα ιδιωτικό (secret) Gist στο GitHub σου.
+// Το app ελέγχει κάθε δευτερόλεπτο αν άλλαξε κάτι και, μόνο τότε, ανεβάζει.
+// Το token (δικαίωμα "gist" μόνο) μένει στο κινητό, εκτός "ud:" (δεν μπαίνει σε backups).
+// Ποτέ δεν αντικαθιστούμε τοπικά δεδομένα αυτόματα: η επαναφορά ζητά πάντα επιβεβαίωση.
+
+const CLOUD_KEY = 'udcloud:config'; // { token, gistId, sig, at, error }
+const GIST_DESC = 'discipline-app-backup';
+const GIST_FILE = 'discipline-backup.json';
+const CLOUD_MIN_GAP = 3000; // όχι πιο συχνά από 1 ανέβασμα / 3"
+
+const getCloud = () => {
+  try { return JSON.parse(localStorage.getItem(CLOUD_KEY)) || null; } catch { return null; }
+};
+const setCloud = (c) => {
+  try {
+    if (c) localStorage.setItem(CLOUD_KEY, JSON.stringify(c)); else localStorage.removeItem(CLOUD_KEY);
+  } catch { /* τίποτα */ }
+};
+
+async function gh(path, token, options = {}) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) { const err = new Error(`GitHub ${res.status}`); err.status = res.status; throw err; }
+  return res.json();
+}
+
+// Τα δεδομένα που ανεβαίνουν (χωρίς συνεδρία timer "σε εξέλιξη")
+function cloudData() {
+  const data = exportAll();
+  delete data['ud:timer:active'];
+  return data;
+}
+
+async function findGist(token) {
+  const list = await gh('/gists?per_page=100', token);
+  return list.find((g) => g.description === GIST_DESC && g.files && g.files[GIST_FILE]) || null;
+}
+
+async function gistFile(token, id) {
+  const g = await gh(`/gists/${id}`, token);
+  const f = g.files && g.files[GIST_FILE];
+  if (!f) throw new Error('empty');
+  if (f.truncated) return (await fetch(f.raw_url)).text();
+  return f.content;
+}
+
+const errorText = (err) => (
+  err.status === 401 ? 'GitHub rejected the token. Reconnect.'
+    : err.status === 403 ? 'GitHub is limiting requests. Retrying later.'
+      : 'Could not reach GitHub. Retrying.'
+);
+
+let cloudBusy = false;
+let cloudLastTry = 0;
+
+async function cloudSync({ force = false } = {}) {
+  const cfg = getCloud();
+  if (!cfg || cloudBusy || !navigator.onLine) return;
+  const data = cloudData();
+  const sig = JSON.stringify(data);
+  if (!force && sig === cfg.sig) return;
+  if (!force && Date.now() - cloudLastTry < CLOUD_MIN_GAP) return;
+  if (!hasData(summarize(data))) return; // ποτέ δεν ανεβάζουμε "άδειο" πάνω από αντίγραφο
+  cloudBusy = true;
+  cloudLastTry = Date.now();
+  const files = { [GIST_FILE]: { content: JSON.stringify({ app: 'discipline', version: 1, exportedAt: Date.now(), data }) } };
+  try {
+    let gistId = cfg.gistId;
+    if (gistId) {
+      try {
+        await gh(`/gists/${gistId}`, cfg.token, { method: 'PATCH', body: JSON.stringify({ files }) });
+      } catch (err) {
+        if (err.status !== 404) throw err;
+        gistId = null; // το Gist σβήστηκε: φτιάχνουμε νέο
+      }
+    }
+    if (!gistId) {
+      const g = await gh('/gists', cfg.token, { method: 'POST', body: JSON.stringify({ description: GIST_DESC, public: false, files }) });
+      gistId = g.id;
+    }
+    setCloud({ ...getCloud(), gistId, sig, at: Date.now(), error: null });
+  } catch (err) {
+    setCloud({ ...getCloud(), error: errorText(err) });
+  } finally {
+    cloudBusy = false;
+  }
+}
+
+setInterval(cloudSync, 1000);
+document.addEventListener('visibilitychange', () => { if (document.hidden) cloudSync(); });
+
+async function connectCloud(token, el) {
+  let found;
+  try {
+    await gh('/user', token);
+    found = await findGist(token);
+  } catch (err) {
+    toast(err.status === 401 ? 'GitHub did not accept this token' : 'Could not reach GitHub');
+    return;
+  }
+  setCloud({ token, gistId: found ? found.id : null, sig: null, at: null, error: null });
+  if (found) {
+    try {
+      const backup = await readBackup(new File([await gistFile(token, found.id)], 'cloud.json'));
+      const yes = await ask({
+        title: 'Found a cloud backup',
+        text: `It has: ${summaryText(summarize(backup.data))}. Restore it, or keep this phone's data (the cloud copy is then replaced).`,
+        confirmLabel: 'Restore from cloud',
+        cancelLabel: 'Keep this phone',
+      });
+      if (yes) {
+        saveSafetyCopy();
+        replaceAll(backup.data);
+        setCloud({ token, gistId: found.id, sig: JSON.stringify(cloudData()), at: Date.now(), error: null });
+        location.hash = '#/backup';
+        location.reload();
+        return;
+      }
+    } catch { /* αν δεν διαβάζεται, συνεχίζουμε και θα το αντικαταστήσουμε */ }
+  }
+  await cloudSync({ force: true });
+  toast(getCloud().error || 'Cloud backup is on');
+  render(el);
+}
+
+async function restoreFromCloud() {
+  const cfg = getCloud();
+  if (!cfg || !cfg.gistId) { toast('No cloud copy yet'); return; }
+  try {
+    const text = await gistFile(cfg.token, cfg.gistId);
+    await importBackup(new File([text], 'cloud.json'));
+  } catch {
+    toast('Could not read the cloud copy');
+  }
+}
+
+function cloudSection() {
+  const cfg = getCloud();
+  if (!cfg) {
+    return `
+    <h2 class="section-title">Cloud backup</h2>
+    <p class="muted small-print first-intro">Saves your data to a private place in your GitHub account, automatically, within seconds of every change. It survives deleting the app.</p>
+    <ol class="muted small-print cloud-steps">
+      <li><a class="cloud-link" href="https://github.com/settings/tokens/new?scopes=gist&description=Discipline%20backup" target="_blank" rel="noopener">Open GitHub</a> and create a token (only "gist" is ticked, keep it).</li>
+      <li>Copy the token and paste it below.</li>
+    </ol>
+    <input class="cloud-input" id="cloud-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Paste token here">
+    <button class="btn btn-block" data-cloud-connect>Turn on cloud backup</button>`;
+  }
+  const status = cfg.error
+    ? `<span class="row-value small-value is-low">${escapeHtml(cfg.error)}</span>`
+    : cfg.at ? `<span class="row-value small-value">Synced ${ago(cfg.at)}</span>`
+      : '<span class="row-value small-value muted">Waiting for first sync</span>';
+  return `
+    <h2 class="section-title">Cloud backup</h2>
+    <ul class="list"><li><div class="row row-static"><span class="row-text">
+      <span class="row-title">GitHub (automatic)</span>
+      <span class="row-sub wrap">Every change is saved within seconds.</span></span>${status}</div></li></ul>
+    <button class="btn btn-quiet btn-block" data-cloud-sync>Sync now</button>
+    <button class="link-btn centered" data-cloud-restore>Restore from cloud</button>
+    <button class="link-btn centered" data-cloud-off>Turn off</button>`;
+}
+
 // ===================== Οθόνη =====================
 
 function render(el) {
@@ -229,6 +398,8 @@ function render(el) {
     </label>
     ${safety ? `<button class="link-btn centered" data-undo>Undo the last restore (${ago(safety.at)})</button>` : ''}
 
+    ${cloudSection()}
+
     <h2 class="section-title">Daily copies</h2>
     ${!getSetting('autoBackup')
       ? '<p class="muted small-print">Daily copies are off. Turn them on in Settings.</p>'
@@ -254,6 +425,26 @@ function render(el) {
   el.onclick = async (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
+    if ('cloudConnect' in b.dataset) {
+      const token = el.querySelector('#cloud-token').value.trim();
+      if (!token) { toast('Paste the token first'); return; }
+      b.disabled = true;
+      await connectCloud(token, el);
+      b.disabled = false;
+      return;
+    }
+    if ('cloudSync' in b.dataset) {
+      await cloudSync({ force: true });
+      toast(getCloud().error || 'Cloud copy is up to date');
+      render(el);
+      return;
+    }
+    if ('cloudRestore' in b.dataset) { restoreFromCloud(); return; }
+    if ('cloudOff' in b.dataset) {
+      const yes = await ask({ title: 'Turn off cloud backup?', text: 'Your data stays on this phone. The copy already in GitHub is kept.', confirmLabel: 'Turn off' });
+      if (yes) { setCloud(null); render(el); }
+      return;
+    }
     if ('export' in b.dataset || 'download' in b.dataset) {
       const ok = await exportBackup({ forceDownload: 'download' in b.dataset });
       if (ok) { toast('Backup saved'); render(el); }
@@ -276,12 +467,16 @@ register({
   settingsGroup: 'Data',
 
   homeCard() {
+    const cloud = getCloud();
+    if (cloud && cloud.at && !cloud.error) return { value: '', label: `Cloud synced ${ago(cloud.at)}` };
     const last = store.get('lastExport', null);
     return { value: '', label: last ? `Last backup ${ago(last)}` : 'Never backed up' };
   },
 
   // Υπενθύμιση στην Αρχική: έχεις δεδομένα αλλά όχι πρόσφατο backup
   homeBanner() {
+    const cloud = getCloud();
+    if (cloud && cloud.at && !cloud.error) return null; // το cloud backup δουλεύει
     const last = store.get('lastExport', null);
     if (last && Date.now() - last < REMIND_AFTER_DAYS * DAY) return null;
     if (!hasData(summarize(exportAll()))) return null;
