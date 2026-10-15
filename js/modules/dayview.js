@@ -10,7 +10,7 @@
 
 import { openSheet, escapeHtml } from '../core/router.js';
 import {
-  entriesForDate, onOpenDay, openClassSheet,
+  entriesForDate, onOpenDay, openClassSheet, STATUSES,
   toMin, fromMin, dateKey, startOfDay, addDays, duration,
 } from './calendar.js';
 import { getSessions, getActiveSession, ACTIVITIES } from './timer.js';
@@ -100,10 +100,11 @@ function eventHtml(e, i) {
   const height = Math.max(px(e.end - e.start), px(MIN_VISUAL_MIN) - 2);
   const left = (e.col / e.cols) * 100;
   const width = 100 / e.cols;
-  const cls = e.kind === 'class' ? `kind-class status-${e.status}` : `kind-${e.activity} ${e.stopped ? 'stopped' : ''} ${e.live ? 'live' : ''}`;
+  const cls = e.kind === 'class' ? 'kind-class' : `kind-${e.activity} ${e.stopped ? 'stopped' : ''} ${e.live ? 'live' : ''}`;
   const time = e.live ? `${fromMin(e.start)}, in progress` : `${fromMin(e.start)}–${fromMin(e.end % 1440 === 0 && e.end > 0 ? 1439 : e.end)}`;
+  // Μάθημα: παρουσία (Went, Missed...) και αίθουσα. Focus: μόνο αν σταμάτησε νωρίς.
   const sub = e.kind === 'class'
-    ? (e.entry.room || '')
+    ? [STATUSES[e.status]?.label, e.entry.room].filter(Boolean).join(', ')
     : e.stopped ? 'stopped early' : '';
   return `
     <button class="dv-event ${cls}" data-ev="${i}"

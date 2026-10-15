@@ -733,6 +733,8 @@ body.locked { overflow: hidden; }
 .banner-title { margin: 0; font-size: 16px; font-weight: 650; }
 .banner-text { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
 .banner .btn { flex: none; }
+/* Μέσα σε οθόνη (όχι στην κορυφή της Αρχικής): κανονικά περιθώρια, να μην πατάει πάνω σε κείμενο */
+.banner.banner-flow { margin: 18px 0 0; }
 
 /* ===== Reminders ===== */
 .intro { margin: 0 0 4px; font-size: 15px; max-width: 60ch; }
@@ -1170,13 +1172,11 @@ html[data-nav="back"] #view.enter, html[data-nav="left"] #view.enter { animation
 .dv-event.live { animation: live-pulse 1.8s ease-in-out infinite; }
 @keyframes live-pulse { 50% { filter: brightness(1.35); } }
 
-.kind-class { --ec: #A78BFA; }
-.kind-class.status-attended { --ec: var(--success); }
-.kind-class.status-left { --ec: var(--warning); }
-.kind-class.status-missed { --ec: var(--danger); }
-.kind-study { --ec: #8B5CF6; }
+/* Χρώματα δραστηριοτήτων: μάθημα κόκκινο, study λευκό, reading γαλάζιο, workout πράσινο */
+.kind-class { --ec: #FB7185; }
+.kind-study { --ec: #F8FAFC; }
 .kind-read { --ec: #38BDF8; }
-.kind-workout { --ec: #FB923C; }
+.kind-workout { --ec: #4ADE80; }
 
 .dv-now { position: absolute; left: 50px; right: 0; height: 0; border-top: 2px solid var(--danger); pointer-events: none; }
 .dv-now i { position: absolute; left: -5px; top: -6px; width: 10px; height: 10px; border-radius: 50%; background: var(--danger); }

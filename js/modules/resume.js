@@ -91,7 +91,7 @@ function render(el) {
        <p class="hero-hint">${went} of ${s.counted} ${s.counted === 1 ? 'class' : 'classes'}${compareText(s, p) ? `, ${compareText(s, p)}` : ''}</p>`;
 
   const reminder = s.unmarked
-    ? `<div class="banner" role="status">
+    ? `<div class="banner banner-flow" role="status">
          <div class="banner-body">
            <p class="banner-title">${s.unmarked} ${s.unmarked === 1 ? 'class' : 'classes'} to mark</p>
            <p class="banner-text">Unmarked classes don't count.</p>

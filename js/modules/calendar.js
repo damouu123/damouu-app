@@ -464,7 +464,6 @@ function renderEditList(el) {
     .filter((g) => g.items.length);
 
   el.innerHTML = `
-    <button class="back-link" data-go="calendar">‹ Schedule</button>
     ${groups.map((g) => `
       <h2 class="section-title">${g.name}</h2>
       <ul class="list">${g.items.map((e) => `
@@ -513,7 +512,6 @@ function renderForm(el, id) {
   const v = (s) => escapeHtml(s ?? '');
 
   el.innerHTML = `
-    <button class="back-link" data-go="calendar/edit">‹ Edit schedule</button>
     <form class="form" novalidate>
       <label class="field"><span>Course</span>
         <input name="title" value="${v(e.title)}" autocomplete="off" required></label>

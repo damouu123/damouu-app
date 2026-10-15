@@ -273,6 +273,34 @@ function renderTabbar(activeId) {
 
 let previous = null; // { key, depth, tab }
 
+// ===================== Πίσω (back) =====================
+// Κρατάμε τη διαδρομή που ακολούθησες (π.χ. Today -> Settings -> Backup).
+// Το "‹ Settings" πάνω αριστερά σε πάει στο προηγούμενο βήμα, ένα-ένα.
+const trail = [];                                         // κλειδιά οθονών, η τελευταία = τωρινή
+const titles = new Map([['home', 'Today'], ['settings', 'Settings']]); // τίτλοι οθονών για το κουμπί
+
+function trackTrail(key) {
+  if (trail.length >= 2 && trail[trail.length - 2] === key) trail.pop(); // πήγες πίσω
+  else if (trail[trail.length - 1] !== key) trail.push(key);             // νέα οθόνη
+  if (trail.length > 30) trail.shift();
+}
+
+// Αν δεν υπάρχει ιστορικό (π.χ. άνοιξες κατευθείαν μια σελίδα), πάμε στην "γονική"
+function parentOf(key) {
+  const parts = key.split('/');
+  if (parts.length > 1) return parts.slice(0, -1).join('/');
+  const mod = getModule(parts[0]);
+  return mod && mod.settings ? 'settings' : 'home';
+}
+
+function backTarget() {
+  return trail.length >= 2 ? trail[trail.length - 2] : parentOf(trail[trail.length - 1] || 'home');
+}
+
+function goBack() {
+  navigate(backTarget());
+}
+
 function placeOf(id, mod, params) {
   const tabs = ['home', ...allModules().filter((m) => m.nav).map((m) => m.id)];
   const tab = tabs.indexOf(id);
@@ -337,6 +365,7 @@ function route() {
   const place = { key: parts.join('/') || 'home', ...placeOf(id, mod, params) };
   const direction = directionTo(place);
   previous = place;
+  trackTrail(place.key);
 
   // Όλη η "ζωγραφική" της νέας οθόνης
   const paint = () => {
@@ -363,7 +392,10 @@ function route() {
 
     // Γρανάζι ρυθμίσεων μόνο στην Αρχική, "‹ Settings" μόνο σε οθόνες των Ρυθμίσεων
     document.getElementById('settings-link').hidden = id !== 'home';
-    document.getElementById('back-link').hidden = !(mod && mod.settings && !params.length);
+    // Κουμπί πίσω σε κάθε οθόνη που δεν είναι κορυφαία καρτέλα (Today, Schedule, Focus)
+    const backBtn = document.getElementById('back-link');
+    backBtn.hidden = place.depth < 1;
+    if (!backBtn.hidden) backBtn.textContent = `‹ ${titles.get(backTarget()) || 'Back'}`;
 
     if (mod) {
       try { mod.render(el, params); } catch (err) {
@@ -383,6 +415,8 @@ function route() {
     el.querySelectorAll('.list > li').forEach((li, i) => li.style.setProperty('--i', Math.min(i, 10)));
     el.classList.toggle('stagger', direction !== 'none');
     animateCounts(el);
+    // Η Αρχική έχει τίτλο τη μέρα ("Thursday"), αλλά στο κουμπί πίσω λέγεται "Today"
+    titles.set(place.key, place.key === 'home' ? 'Today' : document.getElementById('page-title').textContent);
   };
 
   // Η κίνηση: με το View Transitions API (Safari 18+, Chrome) η παλιά και η νέα
@@ -402,6 +436,7 @@ function route() {
 }
 
 export function startRouter() {
+  document.getElementById('back-link').addEventListener('click', goBack);
   addEventListener('hashchange', route);
   route();
 }
