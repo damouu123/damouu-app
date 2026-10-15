@@ -23,7 +23,7 @@ import { moduleStore } from '../core/storage.js';
 import { navigate, escapeHtml, toast, openSheet, refresh, icon } from '../core/router.js';
 import { whoosh, reveal } from '../core/feedback.js';
 import {
-  PACKS, SET_PACK, DUPLICATE_COINS, FREE_PACKS, COINS_PER_XP, GOAL_BONUS, GOAL_FOCUS_MIN, FOCUS_XP_PER_MIN, CLASS_POINTS,
+  PACKS, SET_PACK, TEST_BONUS_COINS, DUPLICATE_COINS, FREE_PACKS, COINS_PER_XP, GOAL_BONUS, GOAL_FOCUS_MIN, FOCUS_XP_PER_MIN, CLASS_POINTS,
 } from '../core/rules.js';
 import {
   SETS, CARDS, RARITIES, RARITY_NAMES, rarityOf, statsOf, statNamesOf, roleOf, emblemOf, setById, setOf, cardById,
@@ -56,7 +56,7 @@ export function getCoins() {
   const dup = Object.values(getOpened()).reduce((sum, o) => sum + (o.dupCoins || 0), 0);
   const spent = store.get('purchases', []).reduce((sum, p) => sum + p.price, 0);
   const penalties = getSessions().reduce((sum, s) => sum + (s.reason === 'stopped' ? s.penalty || 0 : 0), 0);
-  return earned + dup - spent - penalties;
+  return earned + dup - spent - penalties + TEST_BONUS_COINS;
 }
 
 // ===================== Δωρεάν packs =====================
@@ -381,6 +381,7 @@ function renderStore(el) {
       <p class="hero-label">Coins</p>
       <p class="hero-number coins ${coins < 0 ? 'is-negative' : ''}">
         <span class="coin" aria-hidden="true"></span><strong data-count="${coins}" data-count-key="coins">${fmt(coins)}</strong></p>
+      ${TEST_BONUS_COINS ? `<p class="hero-hint">Test mode: includes ${fmt(TEST_BONUS_COINS)} bonus coins.</p>` : ''}
     </section>
 
     ${free.length ? `
@@ -395,8 +396,9 @@ function renderStore(el) {
     <h2 class="section-title">Store</h2>
     <div class="store">${['bronze', 'silver', 'gold'].map(storeItem).join('')}</div>
 
-    <h2 class="section-title">Themed packs</h2>
-    <div class="store two">${SETS.map((s) => storeItem(`set:${s.id}`)).join('')}</div>
+    ${SETS.length > 1 ? `
+      <h2 class="section-title">Themed packs</h2>
+      <div class="store two">${SETS.map((s) => storeItem(`set:${s.id}`)).join('')}</div>` : ''}
 
     <h2 class="section-title">Collection</h2>
     <ul class="list">${SETS.map((s) => {
@@ -443,9 +445,9 @@ function renderClub(el, setId) {
 
   el.innerHTML = `
     <a class="back-link" href="#/wallet">‹ Packs</a>
-    <div class="chips set-chips">
+    ${SETS.length > 1 ? `<div class="chips set-chips">
       ${SETS.map((s) => `<button class="chip ${s.id === set.id ? 'selected' : ''}" data-set="${s.id}">${escapeHtml(s.short)}</button>`).join('')}
-    </div>
+    </div>` : ''}
     <p class="muted intro first-intro">${prog.owned} of ${prog.total} cards collected. Complete the set for a Legend pack.</p>
     <div class="progress club-progress"><span style="width:${Math.round((prog.owned / prog.total) * 100)}%"></span></div>
     <div class="chips club-filter">
