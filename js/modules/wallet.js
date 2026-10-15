@@ -23,10 +23,10 @@ import { moduleStore } from '../core/storage.js';
 import { navigate, escapeHtml, toast, openSheet, refresh, icon } from '../core/router.js';
 import { whoosh, reveal } from '../core/feedback.js';
 import {
-  PACKS, DUPLICATE_COINS, FREE_PACKS, COINS_PER_XP, GOAL_BONUS, GOAL_FOCUS_MIN, FOCUS_XP_PER_MIN, CLASS_POINTS,
+  PACKS, SET_PACK, DUPLICATE_COINS, FREE_PACKS, COINS_PER_XP, GOAL_BONUS, GOAL_FOCUS_MIN, FOCUS_XP_PER_MIN, CLASS_POINTS,
 } from '../core/rules.js';
 import {
-  CARDS, RARITIES, RARITY_NAMES, ROLES, STAT_NAMES, SET_NAME, rarityOf, statsOf, cardById,
+  SETS, CARDS, RARITIES, RARITY_NAMES, rarityOf, statsOf, statNamesOf, roleOf, emblemOf, setById, setOf, cardById,
 } from '../../data/cards.js';
 import { getXp, goalDays } from './xp.js';
 import { getSessions } from './timer.js';
@@ -36,6 +36,15 @@ import { weekStart, addDays, dateKey, parseKey } from './calendar.js';
 const store = moduleStore('packs');
 const rank = (rarity) => RARITIES.indexOf(rarity);
 const fmt = (n) => (n < 0 ? `−${Math.abs(n).toLocaleString('en-GB')}` : n.toLocaleString('en-GB'));
+
+// Ορισμός ενός pack: στάνταρ ('bronze'...) ή ενός σετ ('set:barca15')
+function packDef(type) {
+  if (type.startsWith('set:')) {
+    const s = setById(type.slice(4));
+    return { name: s.name, short: s.short, price: SET_PACK.price, cards: SET_PACK.cards, odds: SET_PACK.odds, set: s.id, setDef: s };
+  }
+  return { ...PACKS[type], short: PACKS[type].name.replace(' Pack', '') };
+}
 
 // ===================== Coins =====================
 
@@ -80,7 +89,10 @@ function earnedFree() {
     if (rate !== null && rate >= FREE_PACKS.weekAttendance) out.push({ id: `week-att-${key}`, type: FREE_PACKS.week, why: `Attendance, week of ${short(key)}` });
     if (focusDaysIn(ws) >= FREE_PACKS.weekFocusDays) out.push({ id: `week-focus-${key}`, type: FREE_PACKS.week, why: `Focus 5 days, week of ${short(key)}` });
   }
-  if (collectionProgress().owned === CARDS.length) out.push({ id: 'set-complete', type: FREE_PACKS.setComplete, why: 'Completed the collection' });
+  for (const s of SETS) {
+    const p = collectionProgress(s.id);
+    if (p.owned === p.total) out.push({ id: `set-${s.id}`, type: FREE_PACKS.setComplete, why: `Completed ${s.name}` });
+  }
   return out;
 }
 
@@ -91,9 +103,10 @@ export function freePacks() {
   return earnedFree().filter((p) => !opened[p.id]).sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
 }
 
-function collectionProgress() {
+function collectionProgress(setId) {
   const col = getCollection();
-  return { owned: CARDS.filter((c) => col[c.id]).length, total: CARDS.length };
+  const cards = setId ? CARDS.filter((c) => c.set === setId) : CARDS;
+  return { owned: cards.filter((c) => col[c.id]).length, total: cards.length };
 }
 
 // Όταν κερδίζεις νέο δωρεάν pack (π.χ. πέτυχες τον στόχο), ένα μήνυμα
@@ -117,20 +130,29 @@ function rollRarity(odds) {
   return entries[entries.length - 1][0];
 }
 
-function randomCard(rarity) {
-  const pool = CARDS.filter((c) => rarityOf(c.rating) === rarity);
-  return pool[Math.floor(Math.random() * pool.length)];
+// Κάρτα της σπανιότητας που ζητήθηκε (και του σετ, αν ορίζεται). Αν δεν υπάρχει
+// τέτοια (π.χ. το Barcelona δεν έχει Bronze), παίρνουμε την κοντινότερη.
+function randomCard(rarity, setId) {
+  const all = setId ? CARDS.filter((c) => c.set === setId) : CARDS;
+  for (let d = 0; d < RARITIES.length; d++) {
+    for (const r of [RARITIES[rank(rarity) - d], RARITIES[rank(rarity) + d]]) {
+      if (!r) continue;
+      const pool = all.filter((c) => rarityOf(c.rating) === r);
+      if (pool.length) return pool[Math.floor(Math.random() * pool.length)];
+    }
+  }
+  return all[0];
 }
 
 // Ανοίγει ένα pack: διαλέγει κάρτες, ενημερώνει τη συλλογή, μετατρέπει τις διπλές σε coins
 function openPack(packId, type) {
-  const def = PACKS[type];
+  const def = packDef(type);
   const rarities = Array.from({ length: def.cards }, () => rollRarity(def.odds));
   if (def.guarantee && !rarities.some((r) => rank(r) >= rank(def.guarantee))) rarities[0] = def.guarantee;
 
   const col = getCollection();
   let dupCoins = 0;
-  const cards = rarities.map(randomCard).map((card) => {
+  const cards = rarities.map((r) => randomCard(r, def.set)).map((card) => {
     const rarity = rarityOf(card.rating);
     const isNew = !col[card.id];
     col[card.id] = (col[card.id] || 0) + 1;
@@ -149,7 +171,7 @@ function openPack(packId, type) {
 }
 
 function buyPack(type) {
-  const def = PACKS[type];
+  const def = packDef(type);
   if (getCoins() < def.price) return null;
   const id = `buy-${Date.now().toString(36)}`;
   store.update('purchases', (list) => [...list, { id, type, price: def.price, at: Date.now() }], []);
@@ -158,34 +180,29 @@ function buyPack(type) {
 
 // ===================== Εμφάνιση καρτών και packs =====================
 
-// Ένα σύμβολο ανά ρόλο (στη θέση της φωτογραφίας του παίκτη)
-const ROLE_EMBLEMS = {
-  WAR: '<path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z"/><path d="M12 7v10M9 10h6"/>',
-  HER: '<path d="m12 2 2.4 6.6L21 9l-5 4.6L17.5 21 12 17.3 6.5 21 8 13.6 3 9l6.6-.4z"/>',
-  KNG: '<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>',
-  GEN: '<path d="M5 16a7 7 0 0 1 14 0v4H5zM12 9V3M9 3h6M8 16h8"/>',
-  SAG: '<circle cx="8.5" cy="12" r="3.5"/><circle cx="15.5" cy="12" r="3.5"/><path d="M5 5l3.5 3.5M19 5l-3.5 3.5M12 17v3"/>',
-  SOL: '<path d="M12 2l3 5h-2v15h-2V7H9z"/>',
-};
-
 // Η κάρτα σαν του FIFA. size: 'big' (αποκάλυψη) ή 'small' (συλλογή)
 function cardHtml(card, { size = 'small', isNew = false, count = 0, locked = false } = {}) {
   const rarity = rarityOf(card.rating);
+  const emblem = emblemOf(card);
+  const emblemHtml = emblem.num !== undefined
+    ? `<span class="fc-num">${emblem.num}</span>`
+    : icon(emblem.paths);
   if (locked) {
     return `
       <div class="fcard ${size} r-${rarity} locked" aria-label="${RARITY_NAMES[rarity]} card, not collected yet">
-        <div class="fc-emblem">${icon(ROLE_EMBLEMS[card.role])}</div>
+        <div class="fc-emblem">${emblemHtml}</div>
         <div class="fc-name">?</div>
       </div>`;
   }
   const stats = statsOf(card);
+  const role = roleOf(card);
   return `
     <div class="fcard ${size} r-${rarity}" aria-label="${escapeHtml(card.name)}, ${RARITY_NAMES[rarity]} ${card.rating}">
       <div class="fc-top"><span class="fc-rating">${card.rating}</span><span class="fc-role">${card.role}</span></div>
-      <div class="fc-emblem">${icon(ROLE_EMBLEMS[card.role])}</div>
+      <div class="fc-emblem">${emblemHtml}</div>
       <div class="fc-name">${escapeHtml(card.name)}</div>
       ${size === 'big' ? `<div class="fc-title">${escapeHtml(card.title)}</div>
-      <div class="fc-stats">${STAT_NAMES.map((s) => `<span><b>${stats[s]}</b> ${s}</span>`).join('')}</div>` : ''}
+      <div class="fc-stats">${statNamesOf(card).map((s) => `<span><b>${stats[s]}</b> ${s}</span>`).join('')}</div>` : ''}
       <div class="fc-origin">${escapeHtml(card.origin)}</div>
       ${isNew ? '<span class="fc-badge">NEW</span>' : ''}
       ${count > 1 ? `<span class="fc-count">×${count}</span>` : ''}
@@ -193,11 +210,14 @@ function cardHtml(card, { size = 'small', isNew = false, count = 0, locked = fal
 }
 
 function packHtml(type, size = '') {
-  const def = PACKS[type];
+  const def = packDef(type);
+  const themed = def.setDef;
   return `
-    <div class="pack pack-${type} ${size}" aria-hidden="true">
+    <div class="pack ${themed ? 'pack-set' : `pack-${type}`} ${size}" aria-hidden="true"
+         ${themed ? `style="--pa:${themed.colors[0]};--pb:${themed.colors[1]}"` : ''}>
       <span class="pack-shine"></span>
-      <span class="pack-name">${def.name.replace(' Pack', '')}</span>
+      ${themed ? `<span class="pack-icon">${icon(themed.icon)}</span>` : ''}
+      <span class="pack-name">${escapeHtml(def.short)}</span>
       <span class="pack-sub">${def.cards} cards</span>
     </div>`;
 }
@@ -220,7 +240,7 @@ function openScene(packId, type, onClose) {
   stage.className = `pack-scene glow-${bestRarity}`;
   stage.setAttribute('role', 'dialog');
   stage.setAttribute('aria-modal', 'true');
-  stage.setAttribute('aria-label', `Opening ${PACKS[type].name}`);
+  stage.setAttribute('aria-label', `Opening ${packDef(type).name}`);
   document.body.appendChild(stage);
   document.body.classList.add('locked');
 
@@ -241,7 +261,7 @@ function openScene(packId, type, onClose) {
   // 2) Walkout για Gold+ (καταγωγή, ρόλος, rating), αλλιώς λάμψη
   const best = result.best.card;
   if (level >= rank('gold')) {
-    const beats = [best.origin.toUpperCase(), ROLES[best.role].name.toUpperCase(), String(best.rating)];
+    const beats = [best.origin.toUpperCase(), roleOf(best).name.toUpperCase(), String(best.rating)];
     beats.forEach((text, i) => {
       steps.push(() => {
         if (i === 0) whoosh();
@@ -273,7 +293,7 @@ function openScene(packId, type, onClose) {
     const another = nextPackOption(type);
     stage.innerHTML = `
       <div class="scene-summary">
-        <h2>${escapeHtml(PACKS[type].name)}</h2>
+        <h2>${escapeHtml(packDef(type).name)}</h2>
         <div class="summary-cards">${result.cards.map((c, i) => `
           <div class="summary-card" style="--i:${i}">
             ${cardHtml(c.card, { size: 'small', isNew: c.isNew })}
@@ -312,7 +332,7 @@ function nextPackOption(type) {
   if (free.length) {
     return { label: `Open next free pack (${free.length} left)`, run: () => openScene(free[0].id, free[0].type, refresh) };
   }
-  const def = PACKS[type];
+  const def = packDef(type);
   if (def.price && getCoins() >= def.price) {
     return {
       label: `Buy another for ${fmt(def.price)}`,
@@ -332,18 +352,29 @@ function rulesSheet() {
       <li><div class="row row-static"><span class="row-text"><span class="row-title">Focus</span></span><span class="row-value small-value coin-text">+${FOCUS_XP_PER_MIN} per min</span></div></li>
       <li><div class="row row-static"><span class="row-text"><span class="row-title">Daily goal</span></span><span class="row-value small-value coin-text">+${GOAL_BONUS}</span></div></li>
     </ul>
-    <p class="muted small-print">Every XP is also a coin. Spend coins in the store. Free packs: a Bronze for every daily goal
+    <p class="muted small-print">Every XP is also a coin. Spend coins in the store. Standard packs have cards from every set;
+      a themed pack only has cards from its own set. Free packs: a Bronze for every daily goal
       (all classes and ${GOAL_FOCUS_MIN} min focus), a Silver for every level (Gold every 5th), a Gold for every
-      ${FREE_PACKS.streakEvery} classes in a row, and a Silver for a week with 90% attendance or 5 days of focus.
-      Duplicates turn into coins automatically.</p>
+      ${FREE_PACKS.streakEvery} classes in a row, a Silver for a week with 90% attendance or 5 days of focus,
+      and a Legend pack for completing a whole set. Duplicates turn into coins.</p>
     <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
   (root, close) => root.querySelector('[data-close]').addEventListener('click', close));
+}
+
+function storeItem(type) {
+  const def = packDef(type);
+  const can = getCoins() >= def.price;
+  return `
+    <button class="store-item" data-buy="${type}" ${can ? '' : 'aria-disabled="true"'}>
+      ${packHtml(type)}
+      <span class="price"><span class="coin small" aria-hidden="true"></span>${fmt(def.price)}</span>
+      <span class="need">${can ? `${def.cards} cards` : `${fmt(def.price - getCoins())} more`}</span>
+    </button>`;
 }
 
 function renderStore(el) {
   const coins = getCoins();
   const free = freePacks();
-  const prog = collectionProgress();
 
   el.innerHTML = `
     <section class="hero coins-hero">
@@ -355,36 +386,32 @@ function renderStore(el) {
     ${free.length ? `
       <h2 class="section-title">Your free packs</h2>
       <div class="pack-row">${free.map((p) => `
-        <button class="pack-tile" data-free="${p.id}" data-type="${p.type}" aria-label="Open ${PACKS[p.type].name}: ${escapeHtml(p.why)}">
+        <button class="pack-tile" data-free="${p.id}" data-type="${p.type}" aria-label="Open ${packDef(p.type).name}: ${escapeHtml(p.why)}">
           ${packHtml(p.type)}
           <span class="pack-why">${escapeHtml(p.why)}</span>
         </button>`).join('')}
       </div>` : ''}
 
     <h2 class="section-title">Store</h2>
-    <div class="store">${['bronze', 'silver', 'gold'].map((type) => {
-      const def = PACKS[type];
-      const can = coins >= def.price;
-      return `
-        <button class="store-item" data-buy="${type}" ${can ? '' : 'aria-disabled="true"'}>
-          ${packHtml(type)}
-          <span class="price"><span class="coin small" aria-hidden="true"></span>${fmt(def.price)}</span>
-          <span class="need">${can ? `${def.cards} cards` : `${fmt(def.price - coins)} more`}</span>
-        </button>`;
-    }).join('')}
-    </div>
+    <div class="store">${['bronze', 'silver', 'gold'].map(storeItem).join('')}</div>
+
+    <h2 class="section-title">Themed packs</h2>
+    <div class="store two">${SETS.map((s) => storeItem(`set:${s.id}`)).join('')}</div>
 
     <h2 class="section-title">Collection</h2>
-    <ul class="list">
-      <li><button class="row" data-club>
+    <ul class="list">${SETS.map((s) => {
+      const p = collectionProgress(s.id);
+      return `
+      <li><button class="row" data-club="${s.id}">
+        <span class="set-dot" style="--pa:${s.colors[0]};--pb:${s.colors[1]}">${icon(s.icon)}</span>
         <span class="row-text">
-          <span class="row-title">${SET_NAME}</span>
-          <span class="row-sub">${prog.owned} of ${prog.total} cards</span>
+          <span class="row-title">${escapeHtml(s.name)}</span>
+          <span class="row-sub">${p.owned} of ${p.total} cards</span>
         </span>
-        <span class="mini-progress"><span style="width:${Math.round((prog.owned / prog.total) * 100)}%"></span></span>
+        <span class="mini-progress"><span style="width:${Math.round((p.owned / p.total) * 100)}%"></span></span>
         <span class="row-chevron" aria-hidden="true">›</span>
-      </button></li>
-    </ul>
+      </button></li>`;
+    }).join('')}</ul>
     <button class="link-btn" data-rules>How packs work</button>`;
 
   el.onclick = (ev) => {
@@ -393,26 +420,32 @@ function renderStore(el) {
     const d = b.dataset;
     if (d.free) openScene(d.free, d.type, refresh);
     else if (d.buy) {
-      const def = PACKS[d.buy];
+      const def = packDef(d.buy);
       if (getCoins() < def.price) { toast(`You need ${fmt(def.price - getCoins())} more coins`); return; }
       const id = buyPack(d.buy);
       if (id) openScene(id, d.buy, refresh);
-    } else if ('club' in d) navigate('wallet/club');
+    } else if (d.club) navigate(`wallet/club/${d.club}`);
     else if ('rules' in d) rulesSheet();
   };
 }
 
 let clubFilter = 'all';
+let clubSet = SETS[0].id;
 
-function renderClub(el) {
+function renderClub(el, setId) {
+  if (setId && setById(setId)) clubSet = setId;
+  const set = setById(clubSet);
   const col = getCollection();
-  const prog = collectionProgress();
+  const prog = collectionProgress(set.id);
   const shown = CARDS
-    .filter((c) => clubFilter === 'all' || rarityOf(c.rating) === clubFilter)
+    .filter((c) => c.set === set.id && (clubFilter === 'all' || rarityOf(c.rating) === clubFilter))
     .sort((a, b) => b.rating - a.rating);
 
   el.innerHTML = `
     <a class="back-link" href="#/wallet">‹ Packs</a>
+    <div class="chips set-chips">
+      ${SETS.map((s) => `<button class="chip ${s.id === set.id ? 'selected' : ''}" data-set="${s.id}">${escapeHtml(s.short)}</button>`).join('')}
+    </div>
     <p class="muted intro first-intro">${prog.owned} of ${prog.total} cards collected. Complete the set for a Legend pack.</p>
     <div class="progress club-progress"><span style="width:${Math.round((prog.owned / prog.total) * 100)}%"></span></div>
     <div class="chips club-filter">
@@ -423,17 +456,19 @@ function renderClub(el) {
       <button class="club-card" data-card="${c.id}" ${col[c.id] ? '' : 'disabled'}>
         ${cardHtml(c, { size: 'small', count: col[c.id] || 0, locked: !col[c.id] })}
       </button>`).join('')}
-    </div>`;
+    </div>
+    ${shown.length ? '' : '<p class="muted empty-day">No cards of this rarity in this set.</p>'}`;
 
   el.onclick = (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
+    if (b.dataset.set) { clubSet = b.dataset.set; renderClub(el); return; }
     if (b.dataset.filter) { clubFilter = b.dataset.filter; renderClub(el); return; }
     if (b.dataset.card) {
       const card = cardById(b.dataset.card);
       openSheet(`
         <div class="sheet-card">${cardHtml(card, { size: 'big', count: col[card.id] })}</div>
-        <p class="muted centered">${RARITY_NAMES[rarityOf(card.rating)]}, ${ROLES[card.role].name}. You have ${col[card.id]}.</p>
+        <p class="muted centered">${RARITY_NAMES[rarityOf(card.rating)]}, ${escapeHtml(roleOf(card).name)}. You have ${col[card.id]}.</p>
         <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
       (root, close) => root.querySelector('[data-close]').addEventListener('click', close));
     }
@@ -469,9 +504,9 @@ register({
       </div>`;
   },
 
-  // #/wallet -> κατάστημα, #/wallet/club -> συλλογή
+  // #/wallet -> κατάστημα, #/wallet/club/<σετ> -> συλλογή
   render(el, params = []) {
-    if (params[0] === 'club') renderClub(el);
+    if (params[0] === 'club') renderClub(el, params[1]);
     else renderStore(el);
   },
 });

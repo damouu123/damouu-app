@@ -22,6 +22,10 @@ export const PACKS = {
   legend: { name: 'Legend Pack', price: null, cards: 3, guarantee: 'hero', odds: { gold: 0.55, hero: 0.33, icon: 0.12 } },
 };
 
+// Pack ενός συγκεκριμένου σετ (π.χ. μόνο Barcelona 2015): όλες οι κάρτες του
+// είναι από το ίδιο θέμα. Η τιμή είναι ίδια για κάθε σετ.
+export const SET_PACK = { price: 250, cards: 4, odds: { bronze: 0.25, silver: 0.45, gold: 0.24, hero: 0.05, icon: 0.01 } };
+
 // Πόσα coins δίνει μια διπλή κάρτα (μετατρέπεται αυτόματα)
 export const DUPLICATE_COINS = { bronze: 5, silver: 15, gold: 40, hero: 100, icon: 250 };
 
@@ -36,5 +40,5 @@ export const FREE_PACKS = {
   weekAttendance: 0.9,      // εβδομάδα με τόση παρουσία...
   weekFocusDays: 5,         // ...ή focus τόσες μέρες
   week: 'silver',           // ...ένα Silver
-  setComplete: 'legend',    // ολοκλήρωση συλλογής
+  setComplete: 'legend',    // ολοκλήρωση ενός σετ (σε κάθε σετ ξεχωριστά)
 };
