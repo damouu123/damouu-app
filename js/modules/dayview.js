@@ -152,6 +152,7 @@ export function openDayView(startDate, afterClose) {
       events = layout(eventsFor(day));
       const isToday = dateKey(day) === dateKey(new Date());
       const rel = relativeLabel(day);
+      const shortDay = day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
@@ -171,7 +172,10 @@ export function openDayView(startDate, afterClose) {
         </div>
         <div class="dv-bar">
           <button class="dv-nav" data-step="-1" aria-label="Previous day">‹</button>
-          <button class="dv-today" data-today ${isToday ? 'disabled' : ''}>Today</button>
+          <button class="dv-today" data-today ${isToday ? 'disabled' : ''}
+                  aria-label="${isToday ? 'Today' : `${rel || shortDay}, tap to go to today`}">
+            <strong>${rel || shortDay}</strong>${isToday ? '' : '<span>tap for today</span>'}
+          </button>
           <button class="dv-nav" data-step="1" aria-label="Next day">›</button>
           <button class="dv-done" data-close>Done</button>
         </div>`;
