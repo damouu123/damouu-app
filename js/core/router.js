@@ -4,6 +4,8 @@
 // και δεν ξαναφορτώνει τη σελίδα.
 
 import { allModules, getModule } from './registry.js';
+import { getSetting, setSetting } from './settings.js';
+import { haptic } from './feedback.js';
 
 const view = () => document.getElementById('view');
 let current = null; // το module που φαίνεται τώρα
@@ -195,13 +197,55 @@ function renderHome(el) {
   });
 }
 
-// Οθόνη Ρυθμίσεων: τα modules που χρησιμοποιείς σπάνια
+// ===================== Ρυθμίσεις =====================
+
+// Ένας διακόπτης (σαν των Ρυθμίσεων του iPhone) που αλλάζει μια ρύθμιση
+function toggleRow(name, title, sub) {
+  return `
+    <li><label class="row toggle-row">
+      <span class="row-text"><span class="row-title">${title}</span><span class="row-sub">${sub}</span></span>
+      <input type="checkbox" class="switch" role="switch" data-setting="${name}" ${getSetting(name) ? 'checked' : ''}>
+    </label></li>`;
+}
+
+// Οθόνη Ρυθμίσεων: διακόπτες + τα modules που χρησιμοποιείς σπάνια, σε ομάδες
 function renderSettings(el) {
   const mods = allModules().filter((m) => m.settings);
-  el.innerHTML = `<ul class="list">${mods.map(moduleRow).join('')}</ul>`;
+  const group = (name) => mods.filter((m) => (m.settingsGroup || 'Features') === name).map(moduleRow).join('');
+
+  el.innerHTML = `
+    <h2 class="section-title first">General</h2>
+    <ul class="list">
+      ${toggleRow('sound', 'Sound effects', 'Wheel ticks and the end-of-session chime')}
+      ${toggleRow('haptics', 'Haptics', 'Small vibrations, on iPhone with iOS 18 or later')}
+    </ul>
+
+    <h2 class="section-title">Features</h2>
+    <ul class="list">${group('Features')}</ul>
+
+    <h2 class="section-title">Data</h2>
+    <ul class="list">
+      ${toggleRow('autoBackup', 'Daily copies', 'Keep a copy of your data inside the app every day')}
+      ${group('Data')}
+    </ul>
+    <p class="muted small-print centered" id="app-version"></p>`;
+
+  el.onchange = (ev) => {
+    const name = ev.target.dataset.setting;
+    if (!name) return;
+    setSetting(name, ev.target.checked);
+    if (name === 'haptics' && ev.target.checked) haptic();
+  };
   el.querySelectorAll('[data-go]').forEach((btn) => {
     btn.addEventListener('click', () => navigate(btn.dataset.go));
   });
+
+  // Η έκδοση γράφεται μόνο στο sw.js: τη διαβάζουμε από εκεί (δουλεύει και offline)
+  fetch('sw.js').then((r) => r.text()).then((src) => {
+    const v = src.match(/VERSION = '([^']+)'/);
+    const out = el.querySelector('#app-version');
+    if (v && out) out.textContent = `Discipline ${v[1]}`;
+  }).catch(() => {});
 }
 
 function renderTabbar(activeId) {
@@ -215,6 +259,64 @@ function renderTabbar(activeId) {
     </a>`).join('');
 }
 
+// ===================== Κινήσεις αλλαγής οθόνης =====================
+// Σε ποια κατεύθυνση "γλιστράει" η νέα οθόνη:
+//   ανάμεσα σε καρτέλες της κάτω μπάρας: δεξιά/αριστερά ανάλογα με τη θέση τους
+//   πιο "βαθιά" (π.χ. Today -> XP, Settings -> Backup): έρχεται από δεξιά
+//   πίσω (π.χ. Backup -> Settings): έρχεται από αριστερά
+
+let previous = null; // { key, depth, tab }
+
+function placeOf(id, mod, params) {
+  const tabs = ['home', ...allModules().filter((m) => m.nav).map((m) => m.id)];
+  const tab = tabs.indexOf(id);
+  let depth;
+  if (tab >= 0) depth = params.length; // καρτέλα (+ υπο-οθόνες της, π.χ. calendar/edit)
+  else if (id === 'settings') depth = 1;
+  else if (mod && mod.settings) depth = 2 + params.length;
+  else depth = 1 + params.length;      // π.χ. XP, Weekly review από την Αρχική
+  return { tab, depth };
+}
+
+function directionTo(next) {
+  if (!previous) return 'none';
+  if (previous.key === next.key) return 'none'; // απλή ανανέωση της ίδιας οθόνης
+  if (next.depth > previous.depth) return 'forward';
+  if (next.depth < previous.depth) return 'back';
+  if (next.tab >= 0 && previous.tab >= 0) return next.tab > previous.tab ? 'right' : 'left';
+  return 'fade';
+}
+
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ===================== Αριθμοί που "μετράνε" =====================
+// Κάθε στοιχείο με data-count="123" μετράει από την προηγούμενη τιμή που
+// είδες (ή από 0 την πρώτη φορά) μέχρι τη νέα. data-count-key: ποιος αριθμός
+// είναι (ώστε να θυμόμαστε την προηγούμενη τιμή του).
+const lastCounts = new Map();
+
+function animateCounts(root) {
+  root.querySelectorAll('[data-count]').forEach((node) => {
+    const to = Number(node.dataset.count);
+    const key = node.dataset.countKey || node.textContent;
+    const from = lastCounts.has(key) ? lastCounts.get(key) : 0;
+    lastCounts.set(key, to);
+    const show = (v) => { node.textContent = v < 0 ? `−${Math.abs(v)}` : String(v); };
+    if (from === to || reduceMotion()) { show(to); return; }
+    const t0 = performance.now();
+    const dur = Math.min(900, 400 + Math.abs(to - from) * 4);
+    const step = (now) => {
+      const p = Math.min(1, (now - t0) / dur);
+      show(Math.round(from + (to - from) * (1 - (1 - p) ** 3)));
+      if (p < 1) requestAnimationFrame(step);
+    };
+    show(from);
+    requestAnimationFrame(step);
+  });
+}
+
+// ===================== Η αλλαγή οθόνης =====================
+
 function route() {
   // "#/calendar/edit/abc" -> id "calendar", params ["edit", "abc"]
   const parts = location.hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent);
@@ -226,49 +328,71 @@ function route() {
   // Αν η διεύθυνση δεν αντιστοιχεί σε οθόνη, πάμε στην Αρχική
   if (!builtin && !mod) { navigate('home'); return; }
 
-  // Όταν φεύγουμε από ένα module (όχι απλώς αλλάζουμε υπο-οθόνη του),
-  // του δίνουμε την ευκαιρία να καθαρίσει (π.χ. timers)
-  if (current && current !== mod && current.unmount) {
-    try { current.unmount(); } catch (err) { console.error(err); }
-  }
-  current = mod;
+  const place = { key: parts.join('/') || 'home', ...placeOf(id, mod, params) };
+  const direction = directionTo(place);
+  previous = place;
 
-  const el = view();
-  el.innerHTML = '';
-  el.onclick = null; // καθαρίζουμε handlers της προηγούμενης οθόνης
-  el.onchange = null;
-  // Στην Αρχική ο τίτλος είναι η μέρα της εβδομάδας
-  if (mod) {
-    setTitle(mod.title);
-  } else if (id === 'settings') {
-    setTitle('Settings');
-  } else {
-    document.getElementById('page-title').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
-    document.title = 'Discipline';
-  }
-
-  // Γρανάζι ρυθμίσεων μόνο στην Αρχική, "‹ Settings" μόνο σε οθόνες των Ρυθμίσεων
-  document.getElementById('settings-link').hidden = id !== 'home';
-  document.getElementById('back-link').hidden = !(mod && mod.settings && !params.length);
-
-  if (mod) {
-    try { mod.render(el, params); } catch (err) {
-      console.error(err);
-      el.innerHTML = '<div class="placeholder"><p>This screen failed to load. Go back to Today and try again.</p></div>';
+  // Όλη η "ζωγραφική" της νέας οθόνης
+  const paint = () => {
+    // Όταν φεύγουμε από ένα module (όχι απλώς αλλάζουμε υπο-οθόνη του),
+    // του δίνουμε την ευκαιρία να καθαρίσει (π.χ. timers)
+    if (current && current !== mod && current.unmount) {
+      try { current.unmount(); } catch (err) { console.error(err); }
     }
-  } else if (id === 'settings') {
-    renderSettings(el);
+    current = mod;
+
+    const el = view();
+    el.innerHTML = '';
+    el.onclick = null; // καθαρίζουμε handlers της προηγούμενης οθόνης
+    el.onchange = null;
+    // Στην Αρχική ο τίτλος είναι η μέρα της εβδομάδας
+    if (mod) {
+      setTitle(mod.title);
+    } else if (id === 'settings') {
+      setTitle('Settings');
+    } else {
+      document.getElementById('page-title').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long' });
+      document.title = 'Discipline';
+    }
+
+    // Γρανάζι ρυθμίσεων μόνο στην Αρχική, "‹ Settings" μόνο σε οθόνες των Ρυθμίσεων
+    document.getElementById('settings-link').hidden = id !== 'home';
+    document.getElementById('back-link').hidden = !(mod && mod.settings && !params.length);
+
+    if (mod) {
+      try { mod.render(el, params); } catch (err) {
+        console.error(err);
+        el.innerHTML = '<div class="placeholder"><p>This screen failed to load. Go back to Today and try again.</p></div>';
+      }
+    } else if (id === 'settings') {
+      renderSettings(el);
+    } else {
+      renderHome(el);
+    }
+
+    renderTabbar(id);
+    window.scrollTo(0, 0);
+
+    // Οι γραμμές των λιστών μπαίνουν η μία μετά την άλλη (30ms διαφορά)
+    el.querySelectorAll('.list > li').forEach((li, i) => li.style.setProperty('--i', Math.min(i, 10)));
+    el.classList.toggle('stagger', direction !== 'none');
+    animateCounts(el);
+  };
+
+  // Η κίνηση: με το View Transitions API (Safari 18+, Chrome) η παλιά και η νέα
+  // οθόνη κινούνται μαζί. Σε παλιότερους browsers, μόνο η νέα μπαίνει με κίνηση.
+  document.documentElement.dataset.nav = direction;
+  if (direction !== 'none' && !reduceMotion() && document.startViewTransition) {
+    document.startViewTransition(paint);
   } else {
-    renderHome(el);
+    paint();
+    if (direction !== 'none') {
+      const el = view();
+      el.classList.remove('enter');
+      void el.offsetWidth; // "ανανέωση" διάταξης για να ξαναπαίξει η κίνηση
+      el.classList.add('enter');
+    }
   }
-
-  renderTabbar(id);
-  window.scrollTo(0, 0);
-
-  // Ξαναπαίζουμε την κίνηση εισόδου (αφαίρεση κλάσης, "ανανέωση" διάταξης, επανάθεση)
-  el.classList.remove('enter');
-  void el.offsetWidth;
-  el.classList.add('enter');
 }
 
 export function startRouter() {

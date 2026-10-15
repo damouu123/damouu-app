@@ -276,18 +276,18 @@ function render(el) {
   el.innerHTML = `
     <section class="level">
       <p class="hero-label">Level</p>
-      <p class="level-number">${xp.level}</p>
+      <p class="level-number" data-count="${xp.level}" data-count-key="level">${xp.level}</p>
       <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
         <span style="width:${pct}%"></span>
       </div>
       <p class="level-caption">
-        <span>${xp.total} XP</span>
+        <span><span data-count="${xp.total}" data-count-key="xp-total">${xp.total}</span> XP</span>
         <span class="muted">${xp.to - xp.total} to level ${xp.level + 1}</span>
       </p>
     </section>
 
     <div class="stats">
-      <div class="stat"><strong>${xp.streak}</strong><span>Streak</span></div>
+      <div class="stat"><strong data-count="${xp.streak}" data-count-key="streak">${xp.streak}</strong><span>Streak</span></div>
       <div class="stat"><strong>${xp.bestStreak}</strong><span>Best streak</span></div>
     </div>
 

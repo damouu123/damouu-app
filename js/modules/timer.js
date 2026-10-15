@@ -28,6 +28,7 @@
 import { register, emit } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, navigate, toast, refresh } from '../core/router.js';
+import { chime, tick as wheelTick } from '../core/feedback.js';
 
 const store = moduleStore('timer');
 
@@ -123,48 +124,11 @@ function finish(reason) {
 }
 
 // ===================== Ήχος στο τέλος =====================
-// Οι browsers παίζουν ήχο μόνο αφού αγγίξεις τη σελίδα. Γι' αυτό
-// "ξεκλειδώνουμε" τον ήχο σε ΚΑΘΕ άγγιγμα (όχι μόνο στο Start), ώστε
-// να δουλεύει και μετά από ανανέωση της σελίδας. Το iPhone θέλει επιπλέον
-// να παίξει πραγματικά ένας ήχος μέσα στο άγγιγμα: παίζουμε έναν σιωπηλό.
-//
-// Αν ο χρόνος τελειώσει ενώ δεν βλέπεις το app, ο browser δεν αφήνει
-// ήχο εκείνη τη στιγμή. Τότε τον κρατάμε "σε αναμονή" (pendingChime)
-// και τον παίζουμε μόλις γυρίσεις.
-// Στο iPhone δεν ακούγεται αν είναι ενεργός ο διακόπτης σίγασης.
-let audio = null;
+// Οι ήχοι (και το "ξεκλείδωμά" τους) ζουν στο core/feedback.js.
+// Αν ο χρόνος τελειώσει ενώ δεν βλέπεις το app, ο browser δεν αφήνει ήχο
+// εκείνη τη στιγμή: τον κρατάμε "σε αναμονή" (pendingChime) και τον
+// παίζουμε μόλις γυρίσεις.
 let pendingChime = false;
-function unlockAudio() {
-  try {
-    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-    if (audio.state !== 'running') audio.resume();
-    const silent = audio.createBufferSource();
-    silent.buffer = audio.createBuffer(1, 1, 22050);
-    silent.connect(audio.destination);
-    silent.start(0);
-  } catch { audio = null; }
-}
-document.addEventListener('pointerdown', unlockAudio, { capture: true });
-document.addEventListener('keydown', unlockAudio, { capture: true });
-
-async function chime() {
-  if (!audio) return;
-  try {
-    if (audio.state !== 'running') await audio.resume();
-    const t = audio.currentTime + 0.05;
-    [0, 0.25].forEach((delay, i) => {
-      const osc = audio.createOscillator();
-      const gain = audio.createGain();
-      osc.frequency.value = i ? 880 : 660;
-      gain.gain.setValueAtTime(0.0001, t + delay);
-      gain.gain.exponentialRampToValueAtTime(0.3, t + delay + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 0.5);
-      osc.connect(gain).connect(audio.destination);
-      osc.start(t + delay);
-      osc.stop(t + delay + 0.55);
-    });
-  } catch { /* χωρίς ήχο */ }
-}
 
 // ===================== Κλειδωμένη οθόνη (overlay) =====================
 // Ένα στοιχείο που καλύπτει ΟΛΟ το app, μαζί και την κάτω μπάρα.
@@ -469,6 +433,7 @@ function render(el) {
   let animId = null;
   let frame = null;
   let painted = [0, -1]; // ποιες γραμμές έχουν "στυλ απόστασης" αυτή τη στιγμή
+  let centered = null;   // ποια γραμμή είναι στο κέντρο (για το "τικ")
 
   // Οι γραμμές κοντά στο κέντρο είναι μεγαλύτερες και πιο έντονες
   function paintWheel() {
@@ -484,6 +449,10 @@ function render(el) {
       items[i].style.transform = `scale(${1 - Math.min(d, 2.5) * 0.09})`;
     }
     painted = [lo, hi];
+    // "Τικ" + δόνηση κάθε φορά που περνάει ένας αριθμός από το κέντρο
+    const now = Math.round(pos);
+    if (centered !== null && now !== centered) wheelTick();
+    centered = now;
   }
 
   // Ό,τι εξαρτάται από τα λεπτά: προεπιλογές, υπότιτλος, σημείωση, προσβασιμότητα

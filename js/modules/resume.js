@@ -87,7 +87,7 @@ function render(el) {
        <p class="hero-number xp"><strong>–</strong></p>
        <p class="hero-hint">No classes marked yet.</p>`
     : `<p class="hero-label">Attendance</p>
-       <p class="hero-number xp"><strong>${pct(s.rate)}</strong><span>%</span></p>
+       <p class="hero-number xp"><strong data-count="${pct(s.rate)}" data-count-key="rate-${dateKey(ws)}">${pct(s.rate)}</strong><span>%</span></p>
        <p class="hero-hint">${went} of ${s.counted} ${s.counted === 1 ? 'class' : 'classes'}${compareText(s, p) ? `, ${compareText(s, p)}` : ''}</p>`;
 
   const reminder = s.unmarked

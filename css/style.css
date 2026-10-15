@@ -36,6 +36,9 @@
   --tabbar-h: 60px;
   /* Η καμπύλη κίνησης του iOS: γρήγορη εκκίνηση, απαλή επιβράδυνση */
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
+  /* "Ελατήριο": περνάει λίγο τον στόχο και επιστρέφει, όπως οι κινήσεις του iOS */
+  --spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017 19.4%, 1.067,
+    1.099 24.3%, 1.108 26%, 1.103, 1.088 30.6%, 1.026 38.4%, 1.002 42.5%, 0.99 46.6%, 0.993 55.1%, 1.002 72.9%, 1);
   /* Περιθώρια ασφαλείας για notch και home indicator */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -381,10 +384,18 @@ main { padding: 0 20px 32px; }
 }
 .list li.gap-row.is-unexpected { color: var(--accent); }
 .empty-day { margin: 4px 0 24px; }
-.cancelled-toggle { display: block; margin: 14px 0 0; color: var(--muted); }
-.cancelled-list { margin-top: 10px; }
-.cancelled-list .row-title { text-decoration: line-through; color: var(--muted); }
-.cancelled-list .state { color: var(--accent); }
+/* Ακυρωμένο μάθημα: μία λεπτή, αχνή γραμμή με ετικέτα */
+.row.cancelled-row { min-height: 44px; padding-top: 8px; padding-bottom: 8px; }
+.cancelled-row .row-time, .cancelled-row .row-title { color: var(--muted); opacity: 0.7; }
+.cancelled-row .row-title { text-decoration: line-through; text-decoration-thickness: 1px; }
+.tag {
+  flex: none;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .edit-btn { margin-top: 28px; }
 .sheet .choices { margin-top: 20px; }
 
@@ -763,6 +774,37 @@ body.locked { overflow: hidden; }
 .row-value.small-value { flex: none; font-family: var(--sans); font-size: 15px; }
 .sheet .rules-list .row { min-height: 52px; }
 
+/* ===== Διακόπτες ρυθμίσεων ===== */
+.toggle-row { cursor: pointer; }
+.switch {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 31px;
+  margin: 0;
+  border-radius: 999px;
+  background: var(--line);
+  cursor: pointer;
+  transition: background-color 0.25s;
+}
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 0.35s var(--spring);
+}
+.switch:checked { background: var(--success); }
+.switch:checked::before { transform: translateX(20px); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 /* ===== Today's goal ===== */
 .row-value.good { color: var(--success); }
 .goal-list { margin-top: 16px; }
@@ -802,7 +844,7 @@ body.locked { overflow: hidden; }
 
 /* Το παράθυρο ανεβαίνει από κάτω, και κατεβαίνει όταν κλείνει */
 .sheet-backdrop { animation: fade-in 0.3s ease backwards; }
-.sheet { animation: sheet-up 0.5s var(--ease) backwards; }
+.sheet { animation: sheet-up 0.55s var(--spring) backwards; }
 .sheet-backdrop.closing { animation: fade-out 0.22s ease forwards; pointer-events: none; }
 .sheet-backdrop.closing .sheet { animation: sheet-down 0.22s ease-in forwards; }
 
@@ -815,7 +857,47 @@ body.locked { overflow: hidden; }
 @keyframes focus-in { from { opacity: 0; transform: scale(1.04); } }
 
 /* Κάθε φορά που αλλάζει οθόνη, το περιεχόμενο ανεβαίνει απαλά */
-#view.enter { animation: rise 0.45s var(--ease) backwards; }
+/* --- Αλλαγή σελίδας ---
+   Με View Transitions (Safari 18+, Chrome): η παλιά οθόνη φεύγει και η νέα
+   μπαίνει ταυτόχρονα, στην κατεύθυνση που ορίζει το <html data-nav="...">.
+   Η κάτω μπάρα μένει ακίνητη. */
+main { view-transition-name: page; }
+.tabbar { view-transition-name: tabbar; }
+::view-transition-old(tabbar), ::view-transition-new(tabbar) { animation: none; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: 0.3s; }
+::view-transition-old(page) { animation: page-out 0.32s var(--ease) both; }
+::view-transition-new(page) { animation: page-in 0.5s var(--ease) both; }
+html[data-nav="forward"]::view-transition-old(page) { animation-name: page-out-left; }
+html[data-nav="forward"]::view-transition-new(page) { animation-name: page-in-right; }
+html[data-nav="back"]::view-transition-old(page) { animation-name: page-out-right; }
+html[data-nav="back"]::view-transition-new(page) { animation-name: page-in-left; }
+html[data-nav="right"]::view-transition-old(page) { animation-name: tab-out-left; }
+html[data-nav="right"]::view-transition-new(page) { animation-name: tab-in-right; }
+html[data-nav="left"]::view-transition-old(page) { animation-name: tab-out-right; }
+html[data-nav="left"]::view-transition-new(page) { animation-name: tab-in-left; }
+
+@keyframes page-out { to { opacity: 0; transform: scale(0.98); } }
+@keyframes page-in { from { opacity: 0; transform: translateY(14px) scale(0.99); } }
+@keyframes page-out-left { to { opacity: 0; transform: translateX(-18%); } }
+@keyframes page-in-right { from { opacity: 0; transform: translateX(32%); } }
+@keyframes page-out-right { to { opacity: 0; transform: translateX(22%); } }
+@keyframes page-in-left { from { opacity: 0; transform: translateX(-24%); } }
+@keyframes tab-out-left { to { opacity: 0; transform: translateX(-8%); } }
+@keyframes tab-in-right { from { opacity: 0; transform: translateX(10%); } }
+@keyframes tab-out-right { to { opacity: 0; transform: translateX(8%); } }
+@keyframes tab-in-left { from { opacity: 0; transform: translateX(-10%); } }
+
+/* Χωρίς View Transitions: μόνο η νέα οθόνη μπαίνει με κίνηση */
+#view.enter { animation: page-in 0.45s var(--ease) backwards; }
+html[data-nav="forward"] #view.enter, html[data-nav="right"] #view.enter { animation-name: tab-in-right; }
+html[data-nav="back"] #view.enter, html[data-nav="left"] #view.enter { animation-name: tab-in-left; }
+
+/* Οι γραμμές των λιστών μπαίνουν η μία μετά την άλλη */
+#view.stagger .list > li { animation: rise 0.5s var(--spring) backwards; animation-delay: calc(var(--i, 0) * 32ms + 80ms); }
+
+/* Το εικονίδιο της καρτέλας που πάτησες "αναπηδά" */
+.tab.active svg { animation: tab-pop 0.5s var(--spring); }
+@keyframes tab-pop { 30% { transform: scale(0.82); } }
 .focus-screen { animation: focus-in 0.5s var(--ease) backwards; }
 .focus-inner { animation: rise 0.5s var(--ease) backwards; }
 

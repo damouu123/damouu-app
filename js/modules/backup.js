@@ -9,8 +9,15 @@
 //
 // Δεδομένα (moduleStore('backup')):
 //   lastExport  πότε έκανες τελευταία φορά backup (ms)
+//
+// ΑΥΤΟΜΑΤΟ BACKUP: ένα web app δεν μπορεί να γράψει αρχείο στα Files μόνο του
+// (θέλει πάντα το δικό σου πάτημα). Γι' αυτό, μία φορά τη μέρα, κρατάμε ένα
+// αντίγραφο ΜΕΣΑ στο app (τελευταίες 7 μέρες). Σε προστατεύει από λάθη, αλλά
+// όχι αν σβηστεί το app: για αυτό χρειάζεται και το "Save backup" στα Files.
+// Το κλειδί είναι εκτός "ud:", ώστε τα αντίγραφα να μη μπαίνουν μέσα στα backups.
 
 import { register } from '../core/registry.js';
+import { getSetting } from '../core/settings.js';
 import { moduleStore, exportAll, replaceAll, saveSafetyCopy, getSafetyCopy, clearSafetyCopy } from '../core/storage.js';
 import { escapeHtml, toast, ask } from '../core/router.js';
 
@@ -152,12 +159,56 @@ async function undoImport() {
   location.reload();
 }
 
+// ===================== Αυτόματο ημερήσιο αντίγραφο =====================
+
+const AUTO_KEY = 'udauto:snapshots';
+const AUTO_KEEP = 7;
+const today = () => new Date().toLocaleDateString('sv'); // "2026-10-14"
+
+function getSnapshots() {
+  try { return JSON.parse(localStorage.getItem(AUTO_KEY)) || []; } catch { return []; }
+}
+
+// Κρατάει αντίγραφο αν δεν υπάρχει ήδη σημερινό (και αν υπάρχουν δεδομένα)
+function autoSnapshot() {
+  if (!getSetting('autoBackup')) return;
+  const list = getSnapshots();
+  if (list[0] && list[0].date === today()) return;
+  const data = exportAll();
+  if (!hasData(summarize(data))) return;
+  list.unshift({ date: today(), at: Date.now(), data });
+  try { localStorage.setItem(AUTO_KEY, JSON.stringify(list.slice(0, AUTO_KEEP))); } catch { /* γεμάτη μνήμη */ }
+}
+
+// Όταν ανοίγει το app, και όταν ξαναγυρνάς σε αυτό (π.χ. την επόμενη μέρα)
+autoSnapshot();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) autoSnapshot(); });
+
+async function restoreSnapshot(date) {
+  const snap = getSnapshots().find((s) => s.date === date);
+  if (!snap) return;
+  const day = new Date(snap.at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const yes = await ask({
+    title: 'Go back to this copy?',
+    text: `Copy from ${day}: ${summaryText(summarize(snap.data))}. Everything currently in the app is replaced. You can undo this afterwards.`,
+    confirmLabel: 'Restore copy',
+  });
+  if (!yes) return;
+  saveSafetyCopy();
+  const lastExport = store.get('lastExport', null);
+  replaceAll(snap.data);
+  if (lastExport) store.set('lastExport', lastExport);
+  location.hash = '#/backup';
+  location.reload();
+}
+
 // ===================== Οθόνη =====================
 
 function render(el) {
   const last = store.get('lastExport', null);
   const current = summarize(exportAll());
   const safety = getSafetyCopy();
+  const snapshots = getSnapshots();
 
   el.innerHTML = `
     <p class="muted intro first-intro">Your data lives only on this phone. Save a copy to Files or iCloud Drive.</p>
@@ -177,7 +228,23 @@ function render(el) {
       Choose backup file
       <input type="file" id="backup-file" accept="application/json,.json" hidden>
     </label>
-    ${safety ? `<button class="link-btn centered" data-undo>Undo the last restore (${ago(safety.at)})</button>` : ''}`;
+    ${safety ? `<button class="link-btn centered" data-undo>Undo the last restore (${ago(safety.at)})</button>` : ''}
+
+    <h2 class="section-title">Daily copies</h2>
+    ${!getSetting('autoBackup')
+      ? '<p class="muted small-print">Daily copies are off. Turn them on in Settings.</p>'
+      : snapshots.length ? `
+        <ul class="list">${snapshots.map((s) => `
+          <li><button class="row" data-snapshot="${s.date}">
+            <span class="row-text">
+              <span class="row-title">${new Date(s.at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })}</span>
+              <span class="row-sub">${escapeHtml(summaryText(summarize(s.data)))}</span>
+            </span>
+            <span class="row-value small-value muted">Restore</span>
+          </button></li>`).join('')}
+        </ul>
+        <p class="muted small-print">The app keeps a copy every day, for the last 7 days. These live inside the app, so also save a backup to Files now and then.</p>`
+      : '<p class="muted small-print">The first daily copy is made once you have some data.</p>'}`;
 
   el.querySelector('#backup-file').addEventListener('change', (ev) => {
     const file = ev.target.files && ev.target.files[0];
@@ -193,6 +260,8 @@ function render(el) {
       if (ok) { toast('Backup saved'); render(el); }
     } else if ('undo' in b.dataset) {
       undoImport();
+    } else if (b.dataset.snapshot) {
+      restoreSnapshot(b.dataset.snapshot);
     }
   };
 }
@@ -205,6 +274,7 @@ register({
   icon: '<path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5M4.5 15.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/>',
   order: 70,
   settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
+  settingsGroup: 'Data',
 
   homeCard() {
     const last = store.get('lastExport', null);

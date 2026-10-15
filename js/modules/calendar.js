@@ -212,7 +212,6 @@ function metaLine(e) {
 
 let selected = null;       // η μέρα που βλέπουμε
 let shownMonth = null;     // η 1η του μήνα που δείχνει το ημερολόγιο
-let showCancelled = false; // ανοιχτή η λίστα ακυρωμένων της μέρας
 let swap = false;          // να παίξει η κίνηση αλλαγής μήνα στην επόμενη ζωγραφική
 
 const WEEK_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -286,10 +285,20 @@ function rowHtml(e, now) {
     </button></li>`;
 }
 
+// Ακυρωμένο μάθημα: μία λεπτή, αχνή γραμμή στη θέση του (πάτημα = επαναφορά)
+function cancelledRow(e) {
+  return `
+    <li><button class="row cancelled-row" data-class="${e.key}" aria-label="${escapeHtml(e.title)}, cancelled">
+      <span class="row-time">${e.start}</span>
+      <span class="row-text"><span class="row-title">${escapeHtml(e.title)}</span></span>
+      <span class="tag">Cancelled</span>
+    </button></li>`;
+}
+
 function gapRow(g) {
   return `
     <li class="gap-row ${g.unexpected ? 'is-unexpected' : ''}">
-      <span>${g.unexpected ? 'Free, class cancelled' : 'Free'}</span>
+      <span>Free</span>
       <span>${fromMin(g.start)}–${fromMin(g.end)}, ${duration(g.end - g.start)}</span>
     </li>`;
 }
@@ -307,6 +316,7 @@ function renderMonth(el) {
   // Μαθήματα και κενά μαζί, με σειρά ώρας
   const items = [
     ...live.map((e) => ({ at: toMin(e.start), html: rowHtml(e, now) })),
+    ...cancelled.map((e) => ({ at: toMin(e.start) - 0.5, html: cancelledRow(e) })),
     ...gapsForDate(selected).map((g) => ({ at: g.start, html: gapRow(g) })),
   ].sort((a, b) => a.at - b.at);
 
@@ -329,17 +339,6 @@ function renderMonth(el) {
       ? `<ul class="list">${items.map((i) => i.html).join('')}</ul>`
       : '<p class="muted empty-day">No classes.</p>'}
 
-    ${cancelled.length ? `
-      <button class="link-btn cancelled-toggle" data-toggle>
-        ${showCancelled ? 'Hide' : 'Show'} cancelled (${cancelled.length})</button>
-      ${showCancelled ? `<ul class="list cancelled-list">${cancelled.map((e) => `
-        <li><button class="row" data-restore="${e.key}">
-          <span class="row-time">${e.start}<br>${e.end}</span>
-          <span class="row-text"><span class="row-title">${escapeHtml(e.title)}</span>
-            <span class="row-sub">${escapeHtml(shortMeta(e))}</span></span>
-          <span class="state">Restore</span>
-        </button></li>`).join('')}</ul>` : ''}` : ''}
-
     <button class="btn btn-quiet btn-block edit-btn" data-edit>Edit schedule</button>`;
   swap = false;
 
@@ -359,7 +358,6 @@ function renderMonth(el) {
       // Στον τρέχοντα μήνα επιλέγουμε σήμερα, αλλιώς την 1η
       selected = shownMonth.getMonth() === today.getMonth() && shownMonth.getFullYear() === today.getFullYear()
         ? today : shownMonth;
-      showCancelled = false;
       swap = true;
     } else if (d.day) {
       selected = parseKey(d.day);
@@ -367,18 +365,10 @@ function renderMonth(el) {
         shownMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
         swap = true;
       }
-      showCancelled = false;
     } else if (d.class) {
       const entry = findEntry(d.class);
       if (entry) openClassSheet(entry, el);
       return;
-    } else if (d.restore) {
-      const entry = findEntry(d.restore);
-      if (!entry) return;
-      setStatus(entry, null);
-      toast(`${entry.title} is back in your calendar`);
-    } else if ('toggle' in d) {
-      showCancelled = !showCancelled;
     } else if ('edit' in d) {
       navigate('calendar/edit');
       return;
@@ -393,7 +383,11 @@ function renderMonth(el) {
 function openClassSheet(entry, el) {
   const started = entry.startsAt <= new Date();
   const day = parseKey(entry.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  const actions = started
+  const actions = entry.status === 'cancelled'
+    // Ακυρωμένο: μόνο επαναφορά
+    ? `<p class="muted small-print">This class is cancelled.</p>
+      <div class="stack"><button class="btn btn-block" data-set="cancelled">Restore class</button></div>`
+    : started
     // Ξεκίνησε: όλες οι επιλογές (πάτημα στην ήδη επιλεγμένη = σβήσιμο)
     ? `<div class="choices">${Object.entries(STATUSES).map(([s, { label }]) => `
         <button class="choice is-${s} ${entry.status === s ? 'selected' : ''}" data-set="${s}">${label}</button>`).join('')}
@@ -416,6 +410,7 @@ function openClassSheet(entry, el) {
       const status = entry.status === b.dataset.set ? null : b.dataset.set;
       close();
       setStatus(entry, status); // στέλνει "attendance:changed": εκεί γίνεται και η ειδοποίηση
+      if (entry.status === 'cancelled' && !status) toast(`${entry.title} is back in your calendar`);
       renderMonth(el);
     });
   });
@@ -606,6 +601,5 @@ register({
   unmount() {
     selected = null;
     shownMonth = null;
-    showCancelled = false;
   },
 });

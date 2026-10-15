@@ -219,7 +219,7 @@ function balanceHero(balance, hint = '', hintClass = '') {
   return `
     <p class="hero-label">Scroll time</p>
     <p class="hero-number ${balance < 0 ? 'is-negative' : ''}">
-      <strong>${balance < 0 ? `−${-balance}` : balance}</strong><span>min</span></p>
+      <strong data-count="${balance}" data-count-key="balance">${balance < 0 ? `−${-balance}` : balance}</strong><span>min</span></p>
     ${hint ? `<p class="hero-hint ${hintClass}">${hint}</p>` : ''}`;
 }
 
