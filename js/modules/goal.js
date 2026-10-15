@@ -1,6 +1,6 @@
 // Ημερήσιος στόχος: πήγαινε σε όλα τα μαθήματα της μέρας (ή φύγε νωρίς)
 // και κάνε τουλάχιστον 30' focus. Τις μέρες χωρίς μάθημα αρκεί το focus.
-// Δίνει +20 XP και ένα δωρεάν Bronze pack.
+// Δίνει +20 XP.
 //
 // Δεν αποθηκεύει τίποτα: τον υπολογίζει το xp.js από τις παρουσίες
 // και τις συνεδρίες focus. Εδώ μόνο τον δείχνουμε.
@@ -23,10 +23,10 @@ function render(el) {
   const g = dailyGoal(today);
 
   const status = g.met
-    ? `Goal reached: +${GOAL_BONUS} XP and a free Bronze pack.`
+    ? `Goal reached: +${GOAL_BONUS} XP.`
     : g.classes
-      ? `Go to every class and focus ${GOAL_FOCUS_MIN} min for +${GOAL_BONUS} XP and a free pack.`
-      : `No classes today. Focus ${GOAL_FOCUS_MIN} min for +${GOAL_BONUS} XP and a free pack.`;
+      ? `Go to every class and focus ${GOAL_FOCUS_MIN} min for +${GOAL_BONUS} XP.`
+      : `No classes today. Focus ${GOAL_FOCUS_MIN} min for +${GOAL_BONUS} XP.`;
 
   // Η εβδομάδα με μια κουκκίδα ανά μέρα
   const ws = weekStart(today);
@@ -60,7 +60,7 @@ register({
   order: 15, // στην Αρχική, ανάμεσα στο Schedule και στο XP
   homeCard() {
     const g = dailyGoal(new Date());
-    if (g.met) return { value: `+${GOAL_BONUS}`, label: 'Reached. Free pack waiting' };
+    if (g.met) return { value: `+${GOAL_BONUS}`, label: 'Reached' };
     const parts = [g.classes ? `${g.done}/${g.classes} classes` : null, `${g.focus}/${GOAL_FOCUS_MIN} min focus`].filter(Boolean);
     return { value: '', label: parts.join(', ') };
   },

@@ -46,7 +46,6 @@ function summaryText(s) {
   return [
     `${s.classesMarked} marked ${s.classesMarked === 1 ? 'class' : 'classes'}`,
     `${s.sessions} focus ${s.sessions === 1 ? 'session' : 'sessions'}`,
-    `${s.scrollEntries} scroll ${s.scrollEntries === 1 ? 'entry' : 'entries'}`,
     s.customSchedule ? 'your edited schedule' : 'the original schedule',
   ].join(', ');
 }

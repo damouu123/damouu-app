@@ -13,7 +13,7 @@
 import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { navigate, escapeHtml, toast, openSheet } from '../core/router.js';
-import { CLASS_POINTS, FOCUS_XP_PER_MIN, GOAL_BONUS, GOAL_FOCUS_MIN } from '../core/rules.js';
+import { CLASS_POINTS, FOCUS_XP_PER_MIN, GOAL_BONUS, GOAL_FOCUS_MIN, STOP_PENALTY_XP } from '../core/rules.js';
 import {
   validAttendance, entriesForDate, STATUSES, parseKey, dateKey, startOfDay, addDays,
 } from './calendar.js';
@@ -125,6 +125,14 @@ export function xpEvents() {
       kind: 'focus', title: ACTIVITIES[s.activity]?.label || 'Focus', sub: `${s.minutes} min focus`,
     });
   }
+  // Ποινή: σταμάτησες το focus νωρίς
+  for (const s of getSessions()) {
+    if (s.reason !== 'stopped' || !s.penalty) continue;
+    events.push({
+      at: s.endedAt, date: dateKey(new Date(s.endedAt)), amount: -s.penalty,
+      kind: 'penalty', title: ACTIVITIES[s.activity]?.label || 'Focus', sub: 'stopped early',
+    });
+  }
   for (const g of goalDays()) {
     events.push({
       at: timeOf(g.key, '23:59'), date: g.key, amount: GOAL_BONUS,
@@ -161,7 +169,8 @@ export function streakUntil(toKey) {
 
 export function getXp() {
   const events = xpEvents();
-  const total = events.reduce((sum, e) => sum + e.amount, 0);
+  // Το σύνολο δεν πέφτει ποτέ κάτω από 0
+  const total = Math.max(0, events.reduce((sum, e) => sum + e.amount, 0));
   const level = levelFor(total);
   const { current, best } = streaks(countedRecords());
   return {
@@ -231,9 +240,9 @@ function rulesSheet() {
       ${rule('Missed', '0', 'muted')}
       ${rule('Focus', `+${FOCUS_XP_PER_MIN} per min`)}
       ${rule('Daily goal', `+${GOAL_BONUS}`)}
+      ${rule('Stop focus early', `−${STOP_PENALTY_XP}`, 'is-low')}
     </ul>
-    <p class="muted small-print">Every XP also gives you 1 coin for packs.
-      Daily goal: go to every class that day and focus at least ${GOAL_FOCUS_MIN} min.
+    <p class="muted small-print">Daily goal: go to every class that day and focus at least ${GOAL_FOCUS_MIN} min.
       Your streak counts classes in a row without a miss.</p>
     <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
   (root, close) => root.querySelector('[data-close]').addEventListener('click', close));
@@ -293,11 +302,32 @@ function render(el) {
 
 // ===================== Καταχώρηση =====================
 
+// Η κορυφή της Αρχικής: το level σου, η πρόοδος και τα δύο βασικά κουμπιά
+function renderHomeHero(el) {
+  const xp = getXp();
+  const pct = Math.round(((xp.total - xp.from) / (xp.to - xp.from)) * 100);
+  el.innerHTML = `
+    <button class="hero-level" data-go="xp" aria-label="Level ${xp.level}, ${xp.total} XP. Open XP">
+      <span class="hero-label">Level</span>
+      <span class="hero-number xp"><strong data-count="${xp.level}" data-count-key="level">${xp.level}</strong></span>
+      <span class="progress"><span style="width:${pct}%"></span></span>
+      <span class="level-caption">
+        <span><span data-count="${xp.total}" data-count-key="xp-total">${xp.total}</span> XP</span>
+        <span class="muted">${xp.to - xp.total} to level ${xp.level + 1}</span>
+      </span>
+    </button>
+    <div class="hero-actions">
+      <button class="btn" data-go="timer">Start focus</button>
+      <button class="btn btn-quiet" data-go="goal">Today's goal</button>
+    </div>`;
+}
+
 register({
   id: 'xp',
   title: 'XP',
   icon: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
   order: 20,
+  renderHomeHero, // η κορυφή της Αρχικής
   homeCard() {
     const xp = getXp();
     return {

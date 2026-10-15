@@ -1,8 +1,8 @@
-// Όλοι οι αριθμοί του "παιχνιδιού" σε ένα σημείο: XP, coins, τιμές packs.
-// Τους χρησιμοποιούν πολλά modules (xp, goal, timer, packs). Αν θες να
+// Όλοι οι αριθμοί του "παιχνιδιού" σε ένα σημείο: XP και ποινές.
+// Τους χρησιμοποιούν πολλά modules (xp, goal, timer). Αν θες να
 // αλλάξεις κάποιον κανόνα, τον αλλάζεις μόνο εδώ.
 
-// ----- XP (κάθε XP δίνει και 1 coin) -----
+// ----- XP -----
 export const CLASS_POINTS = { attended: 10, left: 4, missed: 0 }; // Cancelled: δεν μετράει
 export const FOCUS_XP_PER_MIN = 1;   // ολοκληρωμένο focus
 export const GOAL_BONUS = 20;        // ημερήσιος στόχος
@@ -10,7 +10,13 @@ export const GOAL_FOCUS_MIN = 30;    // ο στόχος θέλει τόσα λε
 export const COINS_PER_XP = 1;
 
 // ----- Ποινή -----
-export const STOP_PENALTY_COINS = 25; // σταμάτημα focus νωρίς (χωρίς emergency pass)
+export const STOP_PENALTY_XP = 25; // XP που χάνεις αν σταματήσεις το focus νωρίς (χωρίς emergency pass)
+
+// =====================================================================
+// ΑΠΕΝΕΡΓΟΠΟΙΗΜΕΝΑ: coins και packs (δεν χρησιμοποιούνται αυτή τη στιγμή).
+// Ο κώδικας είναι στο js/modules/wallet.js, data/cards.js και data/icons.js.
+// Για να ξαναμπούν: import του wallet.js στο index.html και των αρχείων στο sw.js.
+// =====================================================================
 
 // ----- ΠΡΟΣΩΡΙΝΟ: coins για δοκιμές -----
 // Προστίθενται στα coins σου ώστε να ανοίξεις πολλά packs και να τα δοκιμάσεις.
