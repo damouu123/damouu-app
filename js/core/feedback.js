@@ -79,6 +79,52 @@ export async function chime() {
   } catch { /* χωρίς ήχο */ }
 }
 
+// "Φσσς": θόρυβος που ανεβαίνει (σκίσιμο pack, εμφάνιση walkout)
+export function whoosh() {
+  haptic();
+  if (!ready()) return;
+  try {
+    const len = Math.floor(audio.sampleRate * 0.5);
+    const buf = audio.createBuffer(1, len, audio.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * Math.sin((Math.PI * i) / len);
+    const src = audio.createBufferSource();
+    src.buffer = buf;
+    const filter = audio.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.Q.value = 2;
+    filter.frequency.setValueAtTime(400, audio.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(4000, audio.currentTime + 0.45);
+    const gain = audio.createGain();
+    gain.gain.value = 0.35;
+    src.connect(filter).connect(gain).connect(audio.destination);
+    src.start();
+  } catch { /* χωρίς ήχο */ }
+}
+
+// Αποκάλυψη κάρτας: συγχορδία, πιο πλούσια όσο πιο σπάνια η κάρτα (level 0-4)
+export function reveal(level = 0) {
+  haptic();
+  if (!ready()) return;
+  try {
+    const t = audio.currentTime + 0.02;
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5].slice(0, 2 + level); // C E G C E
+    notes.forEach((f, i) => {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = level >= 3 ? 'triangle' : 'sine';
+      osc.frequency.value = f;
+      const start = t + i * 0.06;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.9 + level * 0.2);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(start);
+      osc.stop(start + 1.2 + level * 0.2);
+    });
+  } catch { /* χωρίς ήχο */ }
+}
+
 // Μικρή δόνηση (iOS 18+ μέσω κρυφού διακόπτη)
 let hapticLabel = null;
 export function haptic() {

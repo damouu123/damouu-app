@@ -1,12 +1,13 @@
-// Ημερήσιος στόχος: σε μια μέρα με μαθήματα, πήγαινε σε όλα (ή φύγε νωρίς)
-// και κάνε λιγότερο από 30' scroll. Δίνει +20 XP, μία φορά τη μέρα.
+// Ημερήσιος στόχος: πήγαινε σε όλα τα μαθήματα της μέρας (ή φύγε νωρίς)
+// και κάνε τουλάχιστον 30' focus. Τις μέρες χωρίς μάθημα αρκεί το focus.
+// Δίνει +20 XP και ένα δωρεάν Bronze pack.
 //
 // Δεν αποθηκεύει τίποτα: τον υπολογίζει το xp.js από τις παρουσίες
-// και τις καταγραφές scroll. Εδώ μόνο τον δείχνουμε.
+// και τις συνεδρίες focus. Εδώ μόνο τον δείχνουμε.
 
 import { register } from '../core/registry.js';
 import { escapeHtml } from '../core/router.js';
-import { dailyGoal, GOAL_BONUS, GOAL_SCROLL_LIMIT } from './xp.js';
+import { dailyGoal, GOAL_BONUS, GOAL_FOCUS_MIN } from './xp.js';
 import { startOfDay, addDays, weekStart } from './calendar.js';
 
 function row(title, sub, value, cls = '') {
@@ -21,19 +22,20 @@ function render(el) {
   const today = startOfDay(new Date());
   const g = dailyGoal(today);
 
-  let status;
-  if (!g.classes) status = 'No classes today, so no goal. Enjoy the day.';
-  else if (g.met) status = `Goal reached: +${GOAL_BONUS} XP. Stay under ${GOAL_SCROLL_LIMIT} min of scroll to keep it.`;
-  else status = `Go to every class and scroll less than ${GOAL_SCROLL_LIMIT} min for +${GOAL_BONUS} XP.`;
+  const status = g.met
+    ? `Goal reached: +${GOAL_BONUS} XP and a free Bronze pack.`
+    : g.classes
+      ? `Go to every class and focus ${GOAL_FOCUS_MIN} min for +${GOAL_BONUS} XP and a free pack.`
+      : `No classes today. Focus ${GOAL_FOCUS_MIN} min for +${GOAL_BONUS} XP and a free pack.`;
 
   // Η εβδομάδα με μια κουκκίδα ανά μέρα
   const ws = weekStart(today);
   const week = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(ws, i);
     const dg = dailyGoal(d);
-    const state = !dg.classes ? 'none' : d > today ? 'future' : dg.met ? 'met' : d < today ? 'missed' : 'open';
+    const state = d > today ? 'future' : dg.met ? 'met' : d < today ? 'missed' : 'open';
     const label = d.toLocaleDateString('en-GB', { weekday: 'short' });
-    const text = { none: 'no classes', future: 'coming up', met: 'goal reached', missed: 'goal missed', open: 'in progress' }[state];
+    const text = { future: 'coming up', met: 'goal reached', missed: 'goal missed', open: 'in progress' }[state];
     return `<div class="gday ${state}" role="img" aria-label="${label}, ${text}"><i></i><span>${label}</span></div>`;
   }).join('');
   const metThisWeek = Array.from({ length: 7 }, (_, i) => addDays(ws, i)).filter((d) => d <= today && dailyGoal(d).met).length;
@@ -41,11 +43,10 @@ function render(el) {
   el.innerHTML = `
     <p class="muted intro first-intro">${escapeHtml(status)}</p>
 
-    ${g.classes ? `
-      <ul class="list goal-list">
-        ${row('Classes', 'Went or left early', `${g.done} of ${g.classes}`, g.done === g.classes ? 'good' : '')}
-        ${row('Scroll', `Less than ${GOAL_SCROLL_LIMIT} min`, `${g.scroll} min`, g.scroll >= GOAL_SCROLL_LIMIT ? 'is-low' : 'good')}
-      </ul>` : ''}
+    <ul class="list goal-list">
+      ${g.classes ? row('Classes', 'Went or left early', `${g.done} of ${g.classes}`, g.done === g.classes ? 'good' : '') : ''}
+      ${row('Focus', `At least ${GOAL_FOCUS_MIN} min`, `${g.focus} min`, g.focus >= GOAL_FOCUS_MIN ? 'good' : '')}
+    </ul>
 
     <h2 class="section-title">This week</h2>
     <div class="goal-week">${week}</div>
@@ -59,9 +60,9 @@ register({
   order: 15, // στην Αρχική, ανάμεσα στο Schedule και στο XP
   homeCard() {
     const g = dailyGoal(new Date());
-    if (!g.classes) return { value: '', label: 'No classes today' };
-    if (g.met) return { value: `+${GOAL_BONUS}`, label: `Reached. Scroll ${g.scroll} of ${GOAL_SCROLL_LIMIT} min` };
-    return { value: `${g.done}/${g.classes}`, label: `Classes. Scroll ${g.scroll} of ${GOAL_SCROLL_LIMIT} min` };
+    if (g.met) return { value: `+${GOAL_BONUS}`, label: 'Reached. Free pack waiting' };
+    const parts = [g.classes ? `${g.done}/${g.classes} classes` : null, `${g.focus}/${GOAL_FOCUS_MIN} min focus`].filter(Boolean);
+    return { value: '', label: parts.join(', ') };
   },
   render,
 });

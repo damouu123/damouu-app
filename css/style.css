@@ -17,6 +17,7 @@
   --earn: #F0ABFC;          /* ροζ: λεπτά scroll που κέρδισες */
   --xp: #C4B5FD;            /* λεβάντα: XP, πανεπιστήμιο */
   --streak: #FB7185;        /* ροζ-κόκκινο: σερί */
+  --coin: #FCD34D;          /* χρυσό: coins */
   --success: #4ADE80;
   --warning: #FBBF24;
   --danger: #FB7185;
@@ -900,6 +901,254 @@ html[data-nav="back"] #view.enter, html[data-nav="left"] #view.enter { animation
 @keyframes tab-pop { 30% { transform: scale(0.82); } }
 .focus-screen { animation: focus-in 0.5s var(--ease) backwards; }
 .focus-inner { animation: rise 0.5s var(--ease) backwards; }
+
+/* ===== Packs: coins, κατάστημα, συλλογή ===== */
+.coin {
+  display: inline-block;
+  flex: none;
+  align-self: center;
+  width: 34px;
+  height: 34px;
+  margin-right: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c9, #f5c542 45%, #b7791f 100%);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25), 0 0 18px rgba(245, 197, 66, 0.35);
+}
+.coin.small { width: 15px; height: 15px; margin-right: 6px; box-shadow: none; }
+.hero-number.coins { color: var(--coin); }
+.coin-text { color: var(--coin); }
+.btn-glow {
+  background: linear-gradient(135deg, #8B5CF6, #F43F5E);
+  color: #fff;
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+/* Αριθμός πάνω στην καρτέλα */
+.tab-icon { position: relative; display: inline-flex; }
+.tab-badge {
+  position: absolute;
+  top: -6px;
+  right: -11px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+/* Το "κουτί" ενός pack */
+.pack {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 12px;
+  border-radius: 14px;
+  color: #fff;
+  text-align: left;
+}
+.pack::before { content: ""; position: absolute; inset: 7px; border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 10px; }
+.pack-bronze { background: linear-gradient(155deg, #d08a4e, #7a3f17 70%, #4a240b); }
+.pack-silver { background: linear-gradient(155deg, #f3f5f9, #9aa3b5 60%, #5d6577); color: #14161c; }
+.pack-gold { background: linear-gradient(155deg, #fde68a, #e0a526 55%, #8a5a0b); color: #2a1a02; }
+.pack-legend { background: linear-gradient(155deg, #c084fc, #7c3aed 45%, #f43f5e); }
+.pack-shine {
+  position: absolute;
+  inset: -50%;
+  background: linear-gradient(115deg, transparent 42%, rgba(255, 255, 255, 0.45) 50%, transparent 58%);
+  animation: shine 3.2s ease-in-out infinite;
+}
+.pack-name { position: relative; font-family: var(--display); font-size: 19px; font-weight: 800; }
+.pack-sub { position: relative; font-size: 12px; opacity: 0.85; }
+.pack.big { width: min(56vw, 230px); padding: 18px; border-radius: 22px; }
+.pack.big .pack-name { font-size: 32px; }
+.pack.shaking { animation: pack-shake 0.9s ease-in-out infinite; }
+
+.pack-row { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+.pack-row::-webkit-scrollbar { display: none; }
+.pack-tile {
+  flex: 0 0 116px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: transform 0.35s var(--spring);
+}
+.pack-tile:active { transform: scale(0.94); }
+.pack-tile .pack { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); }
+.pack-why { display: block; margin-top: 8px; font-size: 12px; color: var(--muted); }
+
+.store { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.store-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.35s var(--spring);
+}
+.store-item:active { transform: scale(0.95); }
+.store-item[aria-disabled="true"] .pack { filter: grayscale(0.6) brightness(0.65); }
+.price { display: flex; align-items: center; font-weight: 700; color: var(--coin); }
+.need { font-size: 12px; color: var(--muted); }
+.mini-progress { flex: none; width: 64px; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.mini-progress span, .club-progress span { display: block; height: 100%; background: linear-gradient(90deg, #8B5CF6, #F43F5E); }
+
+/* ===== Κάρτες σαν του FIFA ===== */
+.fcard {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  aspect-ratio: 5 / 7;
+  padding: 10px 8px;
+  border-radius: 16px;
+  text-align: center;
+  color: #fff;
+}
+.fcard::before { content: ""; position: absolute; inset: 5px; border: 1.5px solid rgba(255, 255, 255, 0.35); border-radius: 12px; pointer-events: none; }
+.r-bronze { background: linear-gradient(160deg, #e2a46c, #a0612f 55%, #5e3315); color: #fff7ed; }
+.r-silver { background: linear-gradient(160deg, #ffffff, #c4cad6 45%, #7c8597); color: #141821; }
+.r-gold { background: linear-gradient(160deg, #fff1a8, #f2c12e 45%, #a8740f); color: #2b1d02; }
+.r-hero { background: linear-gradient(160deg, #a78bfa, #7c3aed 45%, #f43f5e); color: #fff; box-shadow: 0 0 22px rgba(167, 139, 250, 0.45); }
+.r-icon {
+  background: linear-gradient(135deg, #fffaf0 0%, #f6e3a1 30%, #ffffff 50%, #e9c46a 70%, #fff4d6 100%);
+  background-size: 250% 250%;
+  color: #3b2a05;
+  box-shadow: 0 0 26px rgba(250, 224, 140, 0.55);
+  animation: icon-shimmer 4s linear infinite;
+}
+.fc-top { align-self: stretch; display: flex; flex-direction: column; align-items: flex-start; line-height: 1; }
+.fc-rating { font-family: var(--display); font-size: 26px; font-weight: 800; }
+.fc-role { margin-top: 2px; font-size: 11px; font-weight: 700; opacity: 0.85; }
+.fc-emblem { margin: -4px 0 4px; }
+.fc-emblem .icon { width: 34px; height: 34px; stroke-width: 1.5; }
+.fc-name { font-family: var(--display); font-size: 14px; font-weight: 800; line-height: 1.15; }
+.fc-title { margin-top: 2px; font-size: 12px; opacity: 0.85; }
+.fc-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 2px 14px; margin-top: 10px; font-size: 13px; }
+.fc-stats b { font-weight: 800; }
+.fc-origin { margin-top: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; }
+.fc-badge, .fc-count {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.fc-badge { background: var(--danger); color: #fff; }
+.fc-count { background: rgba(0, 0, 0, 0.35); color: #fff; }
+.fcard.big { width: min(64vw, 250px); padding: 16px 14px; border-radius: 22px; }
+.fcard.big .fc-rating { font-size: 46px; }
+.fcard.big .fc-role { font-size: 14px; }
+.fcard.big .fc-emblem .icon { width: 74px; height: 74px; }
+.fcard.big .fc-name { font-size: 24px; }
+.fcard.locked { justify-content: center; gap: 6px; background: var(--surface); color: var(--muted); border: 1.5px dashed var(--line); box-shadow: none; animation: none; }
+.fcard.locked::before { display: none; }
+.fcard.locked.r-hero, .fcard.locked.r-icon { border-color: var(--accent); }
+.fcard.locked .fc-emblem { margin: 0; opacity: 0.4; }
+
+.club-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.club-card { padding: 0; border: none; background: none; font: inherit; cursor: pointer; transition: transform 0.35s var(--spring); }
+.club-card:not(:disabled):active { transform: scale(0.94); }
+.club-card:disabled { cursor: default; }
+.club-progress { margin-top: 12px; }
+.club-filter { margin-top: 16px; }
+.sheet-card { display: grid; place-items: center; margin-bottom: 12px; }
+
+/* ===== Η σκηνή ανοίγματος pack ===== */
+.pack-scene {
+  --glow: rgba(167, 139, 250, 0.6);
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  overflow-x: hidden;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--safe-top) + 24px) 20px calc(var(--safe-bottom) + 24px);
+  background: radial-gradient(circle at 50% 45%, #1d1a3d, #07070f 70%);
+  animation: fade-in 0.3s ease;
+  cursor: pointer;
+}
+.pack-scene.closing { animation: fade-out 0.25s ease forwards; }
+.glow-bronze { --glow: rgba(224, 154, 94, 0.55); }
+.glow-silver { --glow: rgba(226, 232, 240, 0.55); }
+.glow-gold { --glow: rgba(250, 204, 21, 0.65); }
+.glow-hero { --glow: rgba(244, 63, 94, 0.7); }
+.glow-icon { --glow: rgba(255, 236, 170, 0.9); }
+.scene-rays {
+  position: absolute;
+  inset: -50%;
+  opacity: 0;
+  background: repeating-conic-gradient(from 0deg, var(--glow) 0deg 6deg, transparent 6deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0 18%, transparent 55%);
+  mask-image: radial-gradient(circle, #000 0 18%, transparent 55%);
+  transition: opacity 0.6s;
+  animation: rays-spin 14s linear infinite;
+  pointer-events: none;
+}
+.scene-rays.on { opacity: 0.55; }
+.scene-center { position: relative; display: grid; place-items: center; min-height: 50vh; }
+.scene-center .pack.big { box-shadow: 0 0 60px var(--glow); }
+.scene-hint { position: relative; margin-top: 20px; color: var(--muted); font-size: 14px; text-align: center; }
+.walkout-text {
+  margin: 0;
+  font-family: var(--display);
+  font-size: clamp(40px, 13vw, 72px);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 0 30px var(--glow);
+  animation: walkout-in 0.5s var(--spring) both;
+}
+.walkout-text.rating { font-size: clamp(90px, 32vw, 160px); }
+.scene-flash { width: 120px; height: 120px; border-radius: 50%; background: var(--glow); filter: blur(30px); animation: flash 0.45s ease-out both; }
+.card-reveal { filter: drop-shadow(0 0 30px var(--glow)); animation: card-in 0.8s var(--spring) both; }
+.scene-summary { position: relative; width: 100%; max-width: 480px; text-align: center; cursor: default; }
+.scene-summary h2 { margin: 0 0 16px; font-family: var(--display); font-size: 26px; }
+.scene-summary .stack { margin-top: 20px; }
+.summary-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.summary-card { position: relative; animation: card-in 0.55s var(--spring) backwards; animation-delay: calc(var(--i) * 90ms); }
+.dup-coins { display: block; margin-top: 4px; font-size: 12px; font-weight: 700; color: var(--coin); }
+
+@keyframes pack-shake {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(-3deg) scale(1.02); }
+  40% { transform: rotate(3deg); }
+  60% { transform: rotate(-2deg) scale(1.03); }
+  80% { transform: rotate(2deg); }
+}
+@keyframes shine { 0% { transform: translateX(-60%); } 60%, 100% { transform: translateX(60%); } }
+@keyframes rays-spin { to { transform: rotate(360deg); } }
+@keyframes walkout-in { from { opacity: 0; transform: scale(1.6); letter-spacing: 0.3em; } }
+@keyframes flash { from { transform: scale(0.2); opacity: 1; } to { transform: scale(3); opacity: 0; } }
+@keyframes card-in { from { opacity: 0; transform: rotateY(90deg) scale(0.6); } }
+@keyframes icon-shimmer { to { background-position: 250% 250%; } }
+@keyframes glow-pulse { 50% { box-shadow: 0 0 26px rgba(244, 63, 94, 0.6); } }
 
 /* ===== Toast: σύντομο μήνυμα που σβήνει μόνο του ===== */
 .toast {

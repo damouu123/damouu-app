@@ -1,37 +1,29 @@
-// XP: πόντοι από παρουσίες, focus, scroll και ημερήσιο στόχο. Levels και streak.
+// XP: πόντοι από παρουσίες, focus και ημερήσιο στόχο. Levels και streak.
 //
 // Τα XP ΔΕΝ αποθηκεύονται: υπολογίζονται κάθε φορά από τις "κινήσεις"
-// των άλλων modules, όπως το υπόλοιπο του πορτοφολιού:
+// των άλλων modules (οι αριθμοί είναι στο core/rules.js):
 //   διάλεξη      Went +10, Left early +4, Missed 0 (Cancelled δεν μετράει)
 //   focus        +1 XP ανά λεπτό ολοκληρωμένης συνεδρίας
-//   scroll       −1 XP ανά λεπτό που καταγράφεις
-//   στόχος μέρας +20 αν σε μια μέρα με μαθήματα πήγες σε όλα (ή έφυγες νωρίς)
-//                και έκανες λιγότερο από 30' scroll
-// Το σύνολο δεν πέφτει κάτω από 0. Αποθηκεύουμε μόνο το "τελευταίο σύνολο
-// που είδαμε", για να ξέρουμε πότε να δείξουμε "+25 XP" ή "−30 XP".
+//   στόχος μέρας +20 αν πήγες σε όλα τα μαθήματα της μέρας (αν είχε)
+//                και έκανες τουλάχιστον 30' focus
+// Αν χάσεις διάλεξη ή στόχο, απλώς δεν παίρνεις τίποτα.
+// Αποθηκεύουμε μόνο το "τελευταίο σύνολο που είδαμε", για να ξέρουμε
+// πότε να δείξουμε "+25 XP" ή "Level 4 reached".
 
 import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { navigate, escapeHtml, toast, openSheet } from '../core/router.js';
+import { CLASS_POINTS, FOCUS_XP_PER_MIN, GOAL_BONUS, GOAL_FOCUS_MIN } from '../core/rules.js';
 import {
   validAttendance, entriesForDate, STATUSES, parseKey, dateKey, startOfDay, addDays,
 } from './calendar.js';
 import { getSessions, ACTIVITIES } from './timer.js';
 
 const store = moduleStore('xp');
-// Τα λεπτά scroll τα καταγράφει το wallet. Τα διαβάζουμε από την αποθήκευσή
-// του (και όχι κάνοντας import το wallet.js), για να μην "κυνηγάνε" τα δύο
-// αρχεία το ένα το άλλο (το wallet ήδη χρησιμοποιεί το xp μέσω του resume).
-const walletStore = moduleStore('wallet');
 
-// ===================== Κανόνες =====================
-
-// Πόσους πόντους δίνει κάθε κατάσταση. Το cancelled δεν μετράει καθόλου.
-export const POINTS = { attended: 10, left: 4, missed: 0 };
-export const FOCUS_XP_PER_MIN = 1;
-export const SCROLL_XP_PER_MIN = 1;
-export const GOAL_BONUS = 20;
-export const GOAL_SCROLL_LIMIT = 30; // ο στόχος θέλει ΛΙΓΟΤΕΡΑ από τόσα λεπτά scroll
+// Για όσα modules τα χρειάζονται (π.χ. goal.js)
+export { GOAL_BONUS, GOAL_FOCUS_MIN };
+export const POINTS = CLASS_POINTS;
 
 export function pointsFor(status) {
   return POINTS[status] ?? 0;
@@ -69,11 +61,12 @@ export function countedRecords() {
     .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
 }
 
-// Λεπτά scroll ανά μέρα: { "2026-10-14": 35, ... }
-function scrollByDay() {
+// Λεπτά ολοκληρωμένου focus ανά μέρα: { "2026-10-14": 45, ... }
+function focusByDay() {
   const out = {};
-  for (const s of walletStore.get('spends', [])) {
-    const key = dateKey(new Date(s.at));
+  for (const s of getSessions()) {
+    if (!s.completed) continue;
+    const key = dateKey(new Date(s.endedAt));
     out[key] = (out[key] || 0) + s.minutes;
   }
   return out;
@@ -82,32 +75,35 @@ function scrollByDay() {
 // Ο ημερήσιος στόχος για μια μέρα:
 //   classes  μαθήματα που έγιναν (όχι ακυρωμένα)
 //   done     σε πόσα πήγες ή έφυγες νωρίς
-//   scroll   λεπτά scroll εκείνη τη μέρα
-//   met      πέτυχε ο στόχος; (μόνο σε μέρες με μαθήματα)
-export function dailyGoal(date, scrollMap = scrollByDay()) {
+//   focus    λεπτά ολοκληρωμένου focus εκείνη τη μέρα
+//   met      όλα τα μαθήματα (αν είχε) + τουλάχιστον 30' focus
+export function dailyGoal(date, focusMap = focusByDay()) {
   const key = dateKey(date);
   const live = entriesForDate(date).filter((e) => e.status !== 'cancelled');
   const done = live.filter((e) => e.status === 'attended' || e.status === 'left').length;
-  const scroll = scrollMap[key] || 0;
+  const focus = focusMap[key] || 0;
   return {
     key,
     classes: live.length,
     done,
-    scroll,
-    met: live.length > 0 && done === live.length && scroll < GOAL_SCROLL_LIMIT,
+    focus,
+    met: done === live.length && focus >= GOAL_FOCUS_MIN,
   };
 }
 
-// Οι μέρες που πέτυχες τον στόχο, από την πρώτη σημειωμένη παρουσία έως σήμερα
-function goalDays() {
-  const recs = validAttendance();
-  if (!recs.length) return [];
-  const first = recs.reduce((min, r) => (r.date < min ? r.date : min), recs[0].date);
+// Οι μέρες που πέτυχες τον στόχο, από την πρώτη σου δραστηριότητα έως σήμερα
+export function goalDays() {
+  const dates = [
+    ...validAttendance().map((r) => r.date),
+    ...getSessions().map((s) => dateKey(new Date(s.endedAt))),
+  ];
+  if (!dates.length) return [];
+  const first = dates.reduce((min, d) => (d < min ? d : min));
   const today = startOfDay(new Date());
-  const scroll = scrollByDay();
+  const focus = focusByDay();
   const out = [];
   for (let d = parseKey(first); d <= today; d = addDays(d, 1)) {
-    const g = dailyGoal(d, scroll);
+    const g = dailyGoal(d, focus);
     if (g.met) out.push(g);
   }
   return out;
@@ -129,16 +125,10 @@ export function xpEvents() {
       kind: 'focus', title: ACTIVITIES[s.activity]?.label || 'Focus', sub: `${s.minutes} min focus`,
     });
   }
-  for (const sp of walletStore.get('spends', [])) {
-    events.push({
-      at: sp.at, date: dateKey(new Date(sp.at)), amount: -sp.minutes * SCROLL_XP_PER_MIN,
-      kind: 'scroll', title: sp.where, sub: `${sp.minutes} min scroll`,
-    });
-  }
   for (const g of goalDays()) {
     events.push({
       at: timeOf(g.key, '23:59'), date: g.key, amount: GOAL_BONUS,
-      kind: 'goal', title: 'Daily goal', sub: 'every class, little scroll',
+      kind: 'goal', title: 'Daily goal', sub: 'every class and focus',
     });
   }
   return events.sort((a, b) => a.at - b.at);
@@ -171,7 +161,7 @@ export function streakUntil(toKey) {
 
 export function getXp() {
   const events = xpEvents();
-  const total = Math.max(0, events.reduce((sum, e) => sum + e.amount, 0));
+  const total = events.reduce((sum, e) => sum + e.amount, 0);
   const level = levelFor(total);
   const { current, best } = streaks(countedRecords());
   return {
@@ -188,7 +178,7 @@ export function getXp() {
 // ===================== Ανταπόκριση σε αλλαγές =====================
 
 // Κρατάμε σιωπηλά το τωρινό σύνολο όταν ανοίγει το app και όταν αλλάζει
-// το πρόγραμμα. Έτσι τα "+25 XP" / "−30 XP" δείχνουν μόνο ό,τι άλλαξε τώρα.
+// το πρόγραμμα. Έτσι τα "+25 XP" δείχνουν μόνο ό,τι άλλαξε τώρα.
 function syncSilently() {
   const { total, level } = getXp();
   store.set('lastTotal', total);
@@ -198,7 +188,7 @@ function syncSilently() {
 syncSilently();
 on('schedule:changed', syncSilently);
 
-// Μετά από παρουσία, focus ή scroll: πόσο άλλαξαν τα XP;
+// Μετά από παρουσία ή focus: πόσο άλλαξαν τα XP;
 function announce() {
   const { total, level } = getXp();
   const prevTotal = store.get('lastTotal', total);
@@ -210,12 +200,12 @@ function announce() {
   const before = store.get('goalToday', null);
   const metNow = dailyGoal(new Date()).met;
   const metBefore = before && before.key === today ? before.met : false;
-  const goalNote = metNow && !metBefore ? '. Daily goal reached' : !metNow && metBefore ? '. Daily goal lost' : '';
+  const goalNote = metNow && !metBefore ? '. Daily goal reached' : '';
 
   if (diff > 0) {
     toast(level > prevLevel ? `+${diff} XP. Level ${level} reached` : `+${diff} XP${goalNote}`);
   } else if (diff < 0) {
-    toast(level < prevLevel ? `−${-diff} XP. Back to level ${level}` : `−${-diff} XP${goalNote}`);
+    toast(level < prevLevel ? `−${-diff} XP. Back to level ${level}` : `−${-diff} XP`);
   }
   store.set('lastTotal', total);
   store.set('lastLevel', level);
@@ -223,7 +213,6 @@ function announce() {
 }
 on('attendance:changed', announce);
 on('focus:finished', announce);
-on('wallet:changed', announce);
 
 // ===================== Οθόνη =====================
 
@@ -241,10 +230,10 @@ function rulesSheet() {
       ${rule('Left early', `+${POINTS.left}`)}
       ${rule('Missed', '0', 'muted')}
       ${rule('Focus', `+${FOCUS_XP_PER_MIN} per min`)}
-      ${rule('Scroll', `−${SCROLL_XP_PER_MIN} per min`, 'is-low')}
       ${rule('Daily goal', `+${GOAL_BONUS}`)}
     </ul>
-    <p class="muted small-print">Daily goal: on a day with classes, go to every one and scroll less than ${GOAL_SCROLL_LIMIT} min.
+    <p class="muted small-print">Every XP also gives you 1 coin for packs.
+      Daily goal: go to every class that day and focus at least ${GOAL_FOCUS_MIN} min.
       Your streak counts classes in a row without a miss.</p>
     <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
   (root, close) => root.querySelector('[data-close]').addEventListener('click', close));

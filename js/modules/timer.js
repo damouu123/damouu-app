@@ -20,7 +20,7 @@
 // Δεδομένα (moduleStore('timer')):
 //   active    η συνεδρία που τρέχει τώρα (ή null)
 //   sessions  ιστορικό: [{ id, activity, minutes, startedAt, endedAt, awayMs,
-//                          completed, earned, penalty, reason }]
+//                          completed, earned (XP=coins), penalty (coins), reason }]
 //             reason: null (ολοκληρώθηκε) | 'stopped' | 'emergency'
 //   passes    { date: "2026-10-13", used: 1 } emergency passes της ημέρας
 //   last      τελευταία επιλογή δραστηριότητας/διάρκειας
@@ -29,6 +29,7 @@ import { register, emit } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, navigate, toast, refresh } from '../core/router.js';
 import { chime, tick as wheelTick } from '../core/feedback.js';
+import { FOCUS_XP_PER_MIN, STOP_PENALTY_COINS } from '../core/rules.js';
 
 const store = moduleStore('timer');
 
@@ -38,13 +39,9 @@ export const ACTIVITIES = {
   workout: { label: 'Workout', icon: '<path d="M3 9.5v5M6 7v10M18 7v10M21 9.5v5M6 12h12"/>' },
 };
 
-// Κάθε 2 λεπτά εστίασης = 1 λεπτό scroll, στρογγυλοποίηση ΠΡΟΣ ΤΑ ΚΑΤΩ
-// (25 -> 12, 1 -> 0). Αν στρογγυλοποιούσαμε προς τα πάνω, πολλές συνεδρίες
-// του 1 λεπτού θα έδιναν διπλάσια λεπτά από όσα πρέπει.
-export const EARN_RATE = 0.5;
-export const earnedFor = (minutes) => Math.floor(minutes * EARN_RATE);
-
-export const PENALTY_MIN = 5; // λεπτά που χάνεις από το πορτοφόλι αν σταματήσεις νωρίς
+// Ανταμοιβή: XP και coins ανά λεπτό ολοκληρωμένου focus (κανόνες στο core/rules.js)
+export const earnedFor = (minutes) => minutes * FOCUS_XP_PER_MIN;
+export const PENALTY_COINS = STOP_PENALTY_COINS; // σταμάτημα νωρίς χωρίς emergency pass
 const PASSES_PER_DAY = 2;
 const HOLD_MS = 10000; // πόση ώρα κρατάς πατημένο για να σταματήσεις
 const MIN_MIN = 1;     // από 1 λεπτό...
@@ -114,7 +111,7 @@ function finish(reason) {
     awayMs: Math.round(a.awayMs),
     completed,
     earned: completed ? earnedFor(a.minutes) : 0,
-    penalty: reason === 'stopped' ? PENALTY_MIN : 0,
+    penalty: reason === 'stopped' ? PENALTY_COINS : 0, // σε coins
     reason,
   };
   store.update('sessions', (list) => [...list, session], []);
@@ -267,15 +264,15 @@ function renderConfirm() {
     <div class="focus-inner confirm">
       <h2>Do you really want to stop?</h2>
       <p class="muted">You have ${left} ${left === 1 ? 'minute' : 'minutes'} left.
-        If you stop now, you lose this session and ${PENALTY_MIN} min from your wallet.</p>
+        If you stop now, you lose this session and ${PENALTY_COINS} coins.</p>
       <div class="stack">
         <button class="btn btn-block" data-keep>Keep focusing</button>
         ${passes > 0 ? `
           <button class="btn btn-quiet btn-block" data-emergency>It's an emergency</button>
-          <p class="muted small-print">Stops without the ${PENALTY_MIN} min penalty.
+          <p class="muted small-print">Stops without losing ${PENALTY_COINS} coins.
             ${passes === 1 ? 'This is your last emergency pass today.' : `You have ${passes} emergency passes left today.`}</p>` : `
           <p class="muted small-print">You've used both emergency passes today.</p>`}
-        <button class="btn btn-danger btn-block" data-quit>Stop and lose ${PENALTY_MIN} min</button>
+        <button class="btn btn-danger btn-block" data-quit>Stop and lose ${PENALTY_COINS} coins</button>
       </div>
     </div>`;
 
@@ -293,7 +290,7 @@ function renderConfirm() {
     stop('emergency', 'Emergency stop. No penalty');
   });
   overlay.querySelector('[data-quit]').addEventListener('click', () => {
-    stop('stopped', `Session stopped. ${PENALTY_MIN} min taken from your wallet`);
+    stop('stopped', `Session stopped. −${PENALTY_COINS} coins`);
   });
 }
 
@@ -305,9 +302,9 @@ function renderResult(session) {
   overlay.innerHTML = `
     <div class="focus-inner">
       <p class="hero-label">Session complete</p>
-      <p class="hero-number"><strong>+${session.earned}</strong><span>min</span></p>
+      <p class="hero-number"><strong>+${session.earned}</strong><span>XP</span></p>
       <p>${session.minutes} minutes of ${ACTIVITIES[session.activity].label.toLowerCase()}.
-        Scroll time earned.</p>
+        And +${session.earned} coins for packs.</p>
       <div class="stack"><button class="btn btn-block" data-done>Done</button></div>
     </div>`;
   overlay.querySelector('[data-done]').addEventListener('click', () => {
@@ -463,9 +460,7 @@ function render(el) {
     presets.forEach((b) => b.classList.toggle('selected', Number(b.dataset.minutes) === m));
     caption.textContent = m >= 60 ? hoursText(m) : '';
     const earn = earnedFor(m);
-    note.textContent = earn
-      ? `Finish to earn ${earn} min. Stopping early costs ${PENALTY_MIN}.`
-      : 'Under 2 minutes earns nothing.';
+    note.textContent = `Finish to earn ${earn} XP and ${earn} coins. Stopping early costs ${PENALTY_COINS} coins.`;
   }
 
   function cancelAnim() {

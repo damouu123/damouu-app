@@ -251,12 +251,18 @@ function renderSettings(el) {
 function renderTabbar(activeId) {
   const tabs = [{ id: 'home', title: 'Today', icon: HOME_ICON }, ...allModules().filter((m) => m.nav)];
   const bar = document.getElementById('tabbar');
-  bar.innerHTML = tabs.map((t) => `
+  bar.innerHTML = tabs.map((t) => {
+    // Ένα module μπορεί να δείχνει αριθμό πάνω στην καρτέλα (π.χ. packs που περιμένουν)
+    let badge = 0;
+    try { badge = t.badge ? t.badge() : 0; } catch (err) { console.error(t.id, err); }
+    return `
     <a href="#/${t.id}" class="tab ${t.id === activeId ? 'active' : ''}"
-       ${t.id === activeId ? 'aria-current="page"' : ''}>
-      ${icon(t.icon)}
+       ${t.id === activeId ? 'aria-current="page"' : ''}
+       ${badge ? `aria-label="${escapeHtml(t.title)}, ${badge} new"` : ''}>
+      <span class="tab-icon">${icon(t.icon)}${badge ? `<span class="tab-badge">${badge > 9 ? '9+' : badge}</span>` : ''}</span>
       <span>${escapeHtml(t.title)}</span>
-    </a>`).join('');
+    </a>`;
+  }).join('');
 }
 
 // ===================== Κινήσεις αλλαγής οθόνης =====================
