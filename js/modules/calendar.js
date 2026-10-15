@@ -198,7 +198,7 @@ function unmarked(date, now) {
   return entriesForDate(date).filter((e) => !e.status && e.endsAt <= now);
 }
 
-function metaLine(e) {
+export function metaLine(e) {
   const type = e.type === 'tutorial' ? `Tutorial${e.group ? ` (${e.group})` : ''}` : 'Lecture';
   return [type, e.room, e.teacher].filter(Boolean).join(', ');
 }
@@ -285,16 +285,6 @@ function rowHtml(e, now) {
     </button></li>`;
 }
 
-// Ακυρωμένο μάθημα: μία λεπτή, αχνή γραμμή στη θέση του (πάτημα = επαναφορά)
-function cancelledRow(e) {
-  return `
-    <li><button class="row cancelled-row" data-class="${e.key}" aria-label="${escapeHtml(e.title)}, cancelled">
-      <span class="row-time">${e.start}</span>
-      <span class="row-text"><span class="row-title">${escapeHtml(e.title)}</span></span>
-      <span class="tag">Cancelled</span>
-    </button></li>`;
-}
-
 function gapRow(g) {
   return `
     <li class="gap-row ${g.unexpected ? 'is-unexpected' : ''}">
@@ -316,8 +306,8 @@ function renderMonth(el) {
   // Μαθήματα και κενά μαζί, με σειρά ώρας
   const items = [
     ...live.map((e) => ({ at: toMin(e.start), html: rowHtml(e, now) })),
-    ...cancelled.map((e) => ({ at: toMin(e.start) - 0.5, html: cancelledRow(e) })),
-    ...gapsForDate(selected).map((g) => ({ at: g.start, html: gapRow(g) })),
+    // Τα κενά που προέκυψαν από ακύρωση δεν τα δείχνουμε (unexpected)
+    ...gapsForDate(selected).filter((g) => !g.unexpected).map((g) => ({ at: g.start, html: gapRow(g) })),
   ].sort((a, b) => a.at - b.at);
 
   const title = shownMonth.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
@@ -338,6 +328,7 @@ function renderMonth(el) {
     ${items.length
       ? `<ul class="list">${items.map((i) => i.html).join('')}</ul>`
       : '<p class="muted empty-day">No classes.</p>'}
+    ${cancelled.length ? `<button class="link-btn centered" data-undo-cancel>Undo cancelled (${cancelled.length})</button>` : ''}
 
     <button class="btn btn-quiet btn-block edit-btn" data-edit>Edit schedule</button>`;
   swap = false;
@@ -349,6 +340,7 @@ function renderMonth(el) {
     const b = ev.target.closest('button');
     if (!b) return;
     const d = b.dataset;
+    let openDayAfter = false;
     if (d.month !== undefined) {
       const delta = Number(d.month);
       const today = startOfDay(new Date());
@@ -360,6 +352,7 @@ function renderMonth(el) {
         ? today : shownMonth;
       swap = true;
     } else if (d.day) {
+      openDayAfter = true;
       selected = parseKey(d.day);
       if (selected.getMonth() !== shownMonth.getMonth()) { // μέρα γειτονικού μήνα: πάμε εκεί
         shownMonth = new Date(selected.getFullYear(), selected.getMonth(), 1);
@@ -367,7 +360,10 @@ function renderMonth(el) {
       }
     } else if (d.class) {
       const entry = findEntry(d.class);
-      if (entry) openClassSheet(entry, el);
+      if (entry) openClassSheet(entry, () => renderMonth(el));
+      return;
+    } else if ('undoCancel' in d) {
+      openCancelledSheet(selected, () => renderMonth(el));
       return;
     } else if ('edit' in d) {
       navigate('calendar/edit');
@@ -376,11 +372,50 @@ function renderMonth(el) {
       return;
     }
     renderMonth(el);
+    // Η προβολή ημέρας ανοίγει με animation πάνω από το ημερολόγιο
+    if (openDayAfter && dayViewOpener) dayViewOpener(selected, () => renderMonth(el));
   };
 }
 
-// Φύλλο ενεργειών ενός μαθήματος
-function openClassSheet(entry, el) {
+// Η προβολή ημέρας (dayview.js) δηλώνει εδώ τον εαυτό της όταν φορτωθεί.
+// Έτσι το calendar.js δεν χρειάζεται να την κάνει import (αποφεύγουμε κύκλο).
+let dayViewOpener = null;
+export function onOpenDay(fn) {
+  dayViewOpener = fn;
+}
+
+// Φύλλο με τα ακυρωμένα μαθήματα της μέρας, για επαναφορά (μόνο τίτλοι)
+function openCancelledSheet(date, after) {
+  const list = entriesForDate(date).filter((e) => e.status === 'cancelled');
+  if (!list.length) return;
+  openSheet(`
+    <h2>Cancelled classes</h2>
+    <ul class="list rules-list">${list.map((e) => `
+      <li><div class="row row-static">
+        <span class="row-text"><span class="row-title">${escapeHtml(e.title)}</span></span>
+        <button class="btn btn-small" data-restore="${e.key}">Restore</button>
+      </div></li>`).join('')}
+    </ul>
+    <div class="stack"><button class="btn btn-quiet btn-block" data-close>Done</button></div>`,
+  (root, close) => {
+    root.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if ('close' in b.dataset) { close(); return; }
+      if (b.dataset.restore) {
+        const entry = list.find((x) => x.key === b.dataset.restore);
+        if (!entry) return;
+        setStatus(entry, null);
+        toast(`${entry.title} is back in your calendar`);
+        close();
+        if (after) after();
+      }
+    });
+  });
+}
+
+// Φύλλο ενεργειών ενός μαθήματος. after: τι να γίνει όταν αλλάξει κάτι
+export function openClassSheet(entry, after) {
   const started = entry.startsAt <= new Date();
   const day = parseKey(entry.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const actions = entry.status === 'cancelled'
@@ -411,7 +446,7 @@ function openClassSheet(entry, el) {
       close();
       setStatus(entry, status); // στέλνει "attendance:changed": εκεί γίνεται και η ειδοποίηση
       if (entry.status === 'cancelled' && !status) toast(`${entry.title} is back in your calendar`);
-      renderMonth(el);
+      if (after) after();
     });
   });
 }

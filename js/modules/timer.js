@@ -57,6 +57,8 @@ export function getSessions() {
 }
 
 const getActive = () => store.get('active', null);
+// Για το ημερολόγιο ημέρας: η συνεδρία που τρέχει τώρα (ή null)
+export const getActiveSession = () => getActive();
 const saveActive = (a) => store.set('active', a);
 
 const todayKey = () => new Date().toLocaleDateString('sv'); // "2026-10-13"
