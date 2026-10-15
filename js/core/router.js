@@ -6,6 +6,7 @@
 import { allModules, getModule } from './registry.js';
 import { getSetting, setSetting } from './settings.js';
 import { haptic } from './feedback.js';
+import { checkForUpdates } from './updates.js';
 
 const view = () => document.getElementById('view');
 let current = null; // το module που φαίνεται τώρα
@@ -228,7 +229,16 @@ function renderSettings(el) {
       ${toggleRow('autoBackup', 'Daily copies', 'Keep a copy of your data inside the app every day')}
       ${group('Data')}
     </ul>
-    <p class="muted small-print centered" id="app-version"></p>`;
+    <h2 class="section-title">App</h2>
+    <ul class="list">
+      <li><button class="row" data-update>
+        <span class="row-text">
+          <span class="row-title">Check for updates</span>
+          <span class="row-sub" id="app-version">Discipline</span>
+        </span>
+        <span class="row-chevron" aria-hidden="true">›</span>
+      </button></li>
+    </ul>`;
 
   el.onchange = (ev) => {
     const name = ev.target.dataset.setting;
@@ -240,11 +250,23 @@ function renderSettings(el) {
     btn.addEventListener('click', () => navigate(btn.dataset.go));
   });
 
+  // Έλεγχος ενημέρωσης με το χέρι
+  el.querySelector('[data-update]').addEventListener('click', async () => {
+    toast('Checking for updates...');
+    const result = await checkForUpdates();
+    toast({
+      updating: 'New version found. Updating...',
+      latest: 'You have the latest version',
+      offline: 'No connection. Try again online',
+      unsupported: 'Updates are not supported here',
+    }[result]);
+  });
+
   // Η έκδοση γράφεται μόνο στο sw.js: τη διαβάζουμε από εκεί (δουλεύει και offline)
   fetch('sw.js').then((r) => r.text()).then((src) => {
     const v = src.match(/VERSION = '([^']+)'/);
     const out = el.querySelector('#app-version');
-    if (v && out) out.textContent = `Discipline ${v[1]}`;
+    if (v && out) out.textContent = `Discipline ${v[1]} installed`;
   }).catch(() => {});
 }
 

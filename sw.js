@@ -4,7 +4,7 @@
 //
 // ΣΗΜΑΝΤΙΚΟ: Κάθε φορά που αλλάζεις οποιοδήποτε αρχείο, ανέβασε το VERSION.
 // Έτσι το iPhone καταλαβαίνει ότι υπάρχει νέα έκδοση.
-const VERSION = 'v31';
+const VERSION = 'v32';
 const CACHE = `discipline-${VERSION}`;
 
 // Όλα τα αρχεία του app (σχετικά paths, για να δουλεύει σε GitHub Pages υποφάκελο)
@@ -18,6 +18,7 @@ const ASSETS = [
   './js/core/router.js',
   './js/core/settings.js',
   './js/core/feedback.js',
+  './js/core/updates.js',
   './js/core/rules.js',
   './js/modules/calendar.js',
   './js/modules/dayview.js',

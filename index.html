@@ -48,6 +48,7 @@
   <script type="module">
     import { startRouter } from './js/core/router.js';
     import { requestPersistentStorage } from './js/core/storage.js';
+    import { initUpdates } from './js/core/updates.js';
 
     // Κάθε module καταχωρεί τον εαυτό του στο registry όταν φορτωθεί.
     // Για νέο module (π.χ. workout) αρκεί μία γραμμή import εδώ.
@@ -70,37 +71,8 @@
     addEventListener('offline', syncOnline);
     syncOnline();
 
-    // --- Service worker (offline λειτουργία) ---
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').then((reg) => {
-        const banner = document.getElementById('update-banner');
-        const showUpdate = (worker) => {
-          banner.hidden = false;
-          document.getElementById('update-btn').onclick = () => {
-            worker.postMessage('SKIP_WAITING');
-          };
-        };
-        // Νέα έκδοση ήδη κατεβασμένη και περιμένει
-        if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
-        // Νέα έκδοση κατεβαίνει τώρα
-        reg.addEventListener('updatefound', () => {
-          const worker = reg.installing;
-          worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              showUpdate(worker);
-            }
-          });
-        });
-      });
-
-      // Όταν ενεργοποιηθεί η νέα έκδοση, ξαναφορτώνουμε μία φορά
-      let reloaded = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloaded) return;
-        reloaded = true;
-        location.reload();
-      });
-    }
+    // --- Service worker: offline λειτουργία και ενημερώσεις (js/core/updates.js) ---
+    initUpdates();
   </script>
 </body>
 </html>
