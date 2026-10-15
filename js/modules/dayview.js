@@ -86,6 +86,12 @@ function layout(events) {
 
 const dayTitle = (d) => d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
+// "Yesterday" / "Today" / "Tomorrow" για τις τρεις κοντινές μέρες, αλλιώς null
+function relativeLabel(d) {
+  const diff = Math.round((startOfDay(d) - startOfDay(new Date())) / 86400000); // στρογγυλοποίηση: ώρες αλλαγής ώρας
+  return { '-1': 'Yesterday', 0: 'Today', 1: 'Tomorrow' }[diff] || null;
+}
+
 function summary(events) {
   const classes = events.filter((e) => e.kind === 'class').length;
   const focus = events.filter((e) => e.kind === 'focus' && !e.stopped).reduce((sum, e) => sum + (e.end - e.start), 0);
@@ -145,13 +151,14 @@ export function openDayView(startDate, afterClose) {
     const paint = (slide = '') => {
       events = layout(eventsFor(day));
       const isToday = dateKey(day) === dateKey(new Date());
+      const rel = relativeLabel(day);
       const now = new Date();
       const nowMin = now.getHours() * 60 + now.getMinutes();
 
       root.innerHTML = `
         <div class="dv-head" aria-label="Drag down to close">
           <span class="dv-grab" aria-hidden="true"></span>
-          <div class="dv-title"><strong>${dayTitle(day)}</strong><span>${summary(events)}</span></div>
+          <div class="dv-title"><strong>${rel || dayTitle(day)}</strong><span>${rel ? `${dayTitle(day)}, ` : ''}${summary(events)}</span></div>
         </div>
         ${legend()}
         <div class="dv-body ${slide}">
