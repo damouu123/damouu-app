@@ -1844,3 +1844,364 @@ body.drawer-locked { overflow: hidden; }
 /* Ενότητα χωρίς καρτέλες (π.χ. Fitness προς το παρόν): χωρίς κάτω μπάρα */
 .tabbar[hidden] { display: none; }
 body.no-tabbar { padding-bottom: var(--safe-bottom); }
+
+/* =====================================================================
+   Workout (ενότητα Fitness, js/modules/workout.js)
+   ===================================================================== */
+body.wk-locked { overflow: hidden; }
+
+/* Η οθόνη καταγραφής ανεβαίνει από κάτω και καλύπτει το app */
+.wk-log {
+  position: fixed;
+  inset: 0;
+  z-index: 95; /* πάνω από την κάτω μπάρα, κάτω από το Focus (100) και τα φύλλα (200) */
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+  transform: translateY(100%);
+  transition: transform 0.45s var(--ease);
+}
+.wk-log.open { transform: none; }
+.wk-log[hidden] { display: none; }
+.wk-log-head {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: calc(var(--safe-top) + 10px) 12px 10px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border-bottom: 1px solid var(--line);
+}
+.wk-log-title { text-align: center; font-weight: 700; }
+.wk-finish { background: var(--blue); }
+.wk-log-body { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 10px 14px calc(var(--safe-bottom) + 120px); -webkit-overflow-scrolling: touch; }
+
+.wk-icon-btn {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+  transition: transform 0.3s var(--spring), background-color 0.2s;
+}
+.wk-icon-btn:active { transform: scale(0.88); background: var(--surface); }
+
+.wk-name {
+  width: 100%;
+  margin: 4px 0 8px;
+  padding: 6px 2px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text);
+  font: 700 22px var(--display);
+}
+.wk-name:focus { outline: none; border-bottom-color: var(--blue); }
+
+/* Διάρκεια, όγκος, σετ */
+.wk-live { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 6px; }
+.wk-live div { display: flex; flex-direction: column; }
+.wk-live span { font-size: 13px; color: var(--muted); }
+.wk-live strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.wk-live [data-live="duration"] { color: var(--blue); }
+
+/* Μία άσκηση */
+.wk-ex {
+  margin-top: 14px;
+  padding: 12px 10px 10px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  animation: rise 0.45s var(--ease) backwards;
+}
+.wk-ex-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding: 0 4px 6px; }
+.wk-ex-head h3 { margin: 0; font-size: 17px; font-weight: 700; color: var(--blue); }
+.wk-rest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+  padding: 2px 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.wk-rest-chip .icon { width: 15px; height: 15px; }
+
+/* Γραμμή σετ: Set | Previous | kg | Reps | ✓ */
+.wk-set {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1.25fr) minmax(0, 1fr) minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: 12px;
+  transition: background-color 0.3s;
+}
+.wk-set-head { padding-top: 0; padding-bottom: 2px; font-size: 12px; font-weight: 650; color: var(--muted); text-transform: uppercase; letter-spacing: 0.02em; }
+.wk-set-head span { text-align: center; }
+.wk-set-head span:nth-child(2) { text-align: left; }
+.wk-set-head .icon { width: 15px; height: 15px; }
+.wk-type {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wk-type.t-warmup { color: var(--warning); }
+.wk-type.t-drop { color: var(--blue); }
+.wk-type.t-failure { color: var(--danger); }
+.wk-prev {
+  overflow: hidden;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.wk-prev:disabled { cursor: default; }
+.wk-in {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(20, 42, 110, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px; /* κάτω από 16px το iPhone κάνει zoom */
+  font-weight: 650;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.wk-in::placeholder { color: var(--muted); opacity: 0.55; font-weight: 500; }
+.wk-in:focus { outline: 2px solid var(--blue); outline-offset: 0; background: #fff; }
+.wk-check {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  border-radius: 10px;
+  background: rgba(20, 42, 110, 0.08);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background-color 0.25s, color 0.25s, transform 0.3s var(--spring);
+}
+.wk-check .icon { width: 18px; height: 18px; stroke-width: 2.4; }
+.wk-check:active { transform: scale(0.85); }
+.wk-set.done { background: rgba(23, 149, 90, 0.12); }
+.wk-set.done .wk-in { background: transparent; }
+.wk-set.done .wk-check { background: var(--success); color: #fff; }
+.wk-set.pop .wk-check { animation: check-pop 0.5s var(--spring); }
+@keyframes check-pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+
+.wk-add-set {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 40px;
+  margin-top: 6px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(20, 42, 110, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 0.3s var(--spring);
+}
+.wk-add-set:active { transform: scale(0.97); }
+.wk-add-set .icon, .btn .icon { width: 20px; height: 20px; }
+.wk-log-body > .btn { margin-top: 16px; }
+.wk-discard { color: var(--danger); }
+.wk-empty { display: grid; justify-items: center; gap: 4px; margin: 10vh 0 6px; text-align: center; }
+.wk-empty p { margin: 0; }
+
+/* Χρονόμετρο ξεκούρασης (κάτω μέρος της οθόνης καταγραφής) */
+.wk-rest {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--safe-bottom) + 12px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  background: var(--navy);
+  color: #fff;
+  border-radius: 22px;
+  box-shadow: 0 14px 34px rgba(20, 42, 110, 0.35);
+  animation: rest-in 0.45s var(--spring);
+}
+.wk-rest[hidden] { display: none; }
+@keyframes rest-in { from { opacity: 0; transform: translateY(30px); } }
+.wk-rest-mid { flex: 1; display: grid; gap: 6px; justify-items: center; }
+.wk-rest-mid strong { font: 700 22px var(--display); font-variant-numeric: tabular-nums; }
+.wk-rest-bar { width: 100%; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); overflow: hidden; }
+.wk-rest-bar i { display: block; height: 100%; background: var(--sky); border-radius: inherit; transition: width 0.5s linear; }
+.wk-rest-btn {
+  min-width: 48px;
+  height: 44px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.wk-rest-skip { background: var(--blue); }
+
+/* Κουμπί "Workout 12:34 · Resume" όταν η καταγραφή είναι κατεβασμένη */
+.wk-pill {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 10px);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  border: none;
+  border-radius: 20px;
+  background: var(--navy);
+  color: #fff;
+  font: inherit;
+  text-align: left;
+  box-shadow: 0 14px 30px rgba(20, 42, 110, 0.3);
+  cursor: pointer;
+  animation: rest-in 0.45s var(--spring);
+}
+.wk-pill[hidden] { display: none; }
+body.no-tabbar .wk-pill { bottom: calc(var(--safe-bottom) + 14px); }
+.wk-pill > span:first-of-type { flex: 1; font-variant-numeric: tabular-nums; }
+.wk-pill-go { padding: 6px 12px; border-radius: 12px; background: var(--blue); font-weight: 650; font-size: 14px; }
+
+/* Καρτέλα Workout */
+.wk-start { margin-top: 4px; }
+.wk-section-head { display: flex; align-items: flex-end; justify-content: space-between; }
+.wk-section-head .btn { margin-bottom: 8px; }
+.wk-routines { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.wk-routine {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.wk-routine-main { display: grid; gap: 2px; width: 100%; padding: 0; border: none; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.wk-routine-main .muted { font-size: 14px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wk-start-routine { width: 100%; margin-top: 12px; background: var(--blue); }
+.wk-progress { margin-bottom: 4px; }
+
+/* Routine */
+.wk-routine-list { margin-top: 16px; }
+.wk-routine-list + .btn { margin-top: 12px; }
+.wk-stepper { display: flex; gap: 6px; }
+.wk-stepper .icon-btn { width: 36px; height: 36px; font-size: 20px; }
+.wk-none { padding: 14px 16px; list-style: none; }
+
+/* History */
+.wk-hist-list { display: grid; gap: 12px; margin: 4px 0 0; padding: 0; list-style: none; }
+.wk-hist {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.3s var(--spring);
+}
+.wk-hist:active { transform: scale(0.98); }
+.wk-hist-top { display: grid; }
+.wk-hist-top .muted { font-size: 13px; }
+.wk-hist-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; font-weight: 650; }
+.wk-hist-stats span { display: inline-flex; align-items: center; gap: 4px; }
+.wk-hist-stats .icon { width: 16px; height: 16px; color: var(--blue); }
+.wk-hist-ex { display: grid; gap: 2px; font-size: 14px; }
+.wk-hist-ex > span { display: flex; gap: 6px; overflow: hidden; white-space: nowrap; }
+.wk-best { margin-left: auto; padding-left: 8px; }
+
+/* Φύλλα του Workout */
+.wk-picker { display: flex; flex-direction: column; }
+.wk-search, .wk-custom input, .wk-custom select {
+  width: 100%;
+  min-height: 46px;
+  margin: 8px 0 0;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.wk-custom select { -webkit-appearance: none; appearance: none; }
+.wk-muscles { flex-wrap: nowrap; overflow-x: auto; margin-top: 10px; padding-bottom: 4px; scrollbar-width: none; }
+.wk-muscles::-webkit-scrollbar { display: none; }
+.wk-muscles .chip { flex: none; min-height: 36px; }
+.wk-ex-list { max-height: 44vh; overflow-y: auto; margin-top: 10px; }
+.wk-pick { min-height: 56px; }
+.wk-pick.chosen { background: rgba(124, 196, 247, 0.16); }
+.wk-pick-mark { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-strong); font-size: 13px; font-weight: 700; }
+.wk-pick.chosen .wk-pick-mark { background: var(--sky); border-color: var(--sky); color: var(--navy); }
+.wk-menu .btn { justify-content: flex-start; }
+.wk-menu .btn.selected { border-color: var(--accent); }
+.wk-menu .wk-type { pointer-events: none; }
+.wk-rest-options { margin-top: 14px; }
+.wk-summary { display: grid; justify-items: center; gap: 4px; text-align: center; }
+.wk-summary h2 { margin: 6px 0 0; }
+.wk-summary-badge { display: grid; place-items: center; width: 64px; height: 64px; border-radius: 50%; background: var(--success); color: #fff; animation: check-pop 0.6s var(--spring); }
+.wk-summary-badge .icon { width: 32px; height: 32px; stroke-width: 2.4; }
+.wk-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; margin-top: 14px; }
+.wk-stats div { display: grid; padding: 10px 6px; border-radius: 16px; background: var(--surface); }
+.wk-stats strong { font-size: 17px; }
+.wk-stats span { font-size: 12px; color: var(--muted); }
+.wk-records { margin-top: 12px !important; color: var(--accent); font-weight: 650; }
