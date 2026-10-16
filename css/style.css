@@ -1,26 +1,34 @@
 /* ===== Χρώματα, γραμματοσειρές, μεγέθη (αλλάζεις εδώ, αλλάζει παντού) =====
-   Ιδέα: αναλόγιο διαβάσματος το βράδυ. Ζεστό σκούρο φόντο, κείμενο σαν χαρτί,
-   και κεχριμπαρένιο "φως λάμπας" μόνο για ό,τι κερδίζεις. */
+   Θέμα "Ocean" (από την εικόνα που διάλεξες): ανοιχτό γαλάζιο φόντο,
+   "γυάλινες" λευκές κάρτες, σκούρο navy για τα πάνελ και έντονο μπλε. */
 :root {
-  /* Παλέτα "Arcade" (UI/UX Pro Max, προφίλ Gaming): σκούρο μωβ-μπλε, βιολετί, ροζ.
-     Κάθε χρώμα έχει όνομα ΡΟΛΟΥ, ώστε να αλλάζει η παλέτα μόνο εδώ. */
-  --bg: #0F0F23;            /* φόντο */
-  --surface: #1A1930;       /* κάρτες, λίστες */
-  --surface-press: #24223F; /* πατημένη κάρτα */
-  --line: #2D2A4A;          /* διαχωριστικές γραμμές */
-  --text: #EEF0F8;
-  --muted: #A1A4C0;         /* δευτερεύον κείμενο (αντίθεση ~7:1 στο φόντο) */
+  /* Κάθε χρώμα έχει όνομα ΡΟΛΟΥ, ώστε να αλλάζει η παλέτα μόνο εδώ. */
+  --bg: #E9F1FB;                          /* φόντο (πάνω) */
+  --bg-deep: #D2E3F5;                     /* φόντο (κάτω) */
+  --surface: rgba(255, 255, 255, 0.66);   /* γυάλινες κάρτες, λίστες */
+  --surface-press: rgba(255, 255, 255, 0.95);
+  --glass-edge: rgba(255, 255, 255, 0.75);/* φωτεινό περίγραμμα του "γυαλιού" */
+  --glass-blur: blur(18px) saturate(1.4);
+  --shadow: 0 10px 30px rgba(31, 84, 160, 0.12);
+  --line: rgba(20, 42, 110, 0.09);        /* διαχωριστικές γραμμές */
+  --line-strong: rgba(20, 42, 110, 0.22);
+  --text: #12245E;                        /* navy κείμενο */
+  --muted: #5B6A8F;                       /* δευτερεύον κείμενο (~5:1 στο φόντο) */
 
-  --primary: #7C3AED;       /* φόντο κύριων κουμπιών (λευκό κείμενο ~5.7:1) */
+  --navy: #142A6E;
+  --blue: #1F7FD6;
+  --sky: #5AB4F0;
+
+  --primary: var(--navy);   /* φόντο κύριων κουμπιών */
   --on-primary: #FFFFFF;
-  --accent: #A78BFA;        /* βιολετί για κείμενο/εικονίδια: επιλεγμένα, σύνδεσμοι */
-  --earn: #F0ABFC;          /* ροζ: λεπτά scroll που κέρδισες */
-  --xp: #C4B5FD;            /* λεβάντα: XP, πανεπιστήμιο */
-  --streak: #FB7185;        /* ροζ-κόκκινο: σερί */
-  --coin: #FCD34D;          /* χρυσό: coins */
-  --success: #4ADE80;
-  --warning: #FBBF24;
-  --danger: #FB7185;
+  --accent: var(--blue);    /* επιλεγμένα, σύνδεσμοι */
+  --earn: var(--blue);
+  --xp: var(--blue);
+  --streak: #E8566C;
+  --coin: #E0A526;
+  --success: #17955A;
+  --warning: #C77A00;
+  --danger: #D9405A;
 
   /* Καταστάσεις παρουσίας */
   --went: var(--success);
@@ -32,8 +40,8 @@
   --display: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
   --sans: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
 
-  --r-lg: 20px;   /* μεγάλα κομμάτια */
-  --r-md: 14px;   /* κουμπιά */
+  --r-lg: 24px;   /* μεγάλα κομμάτια */
+  --r-md: 16px;   /* κουμπιά */
   --tabbar-h: 60px;
   /* Η καμπύλη κίνησης του iOS: γρήγορη εκκίνηση, απαλή επιβράδυνση */
   --ease: cubic-bezier(0.32, 0.72, 0, 1);
@@ -43,7 +51,7 @@
   /* Περιθώρια ασφαλείας για notch και home indicator */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * { box-sizing: border-box; }
@@ -1437,3 +1445,205 @@ html[data-nav="back"] #view.enter, html[data-nav="left"] #view.enter { animation
   border: 1px solid var(--line);
   border-radius: var(--r-md);
 }
+
+/* =====================================================================
+   Θέμα "Ocean": γυαλί, μπλε κάρτες και navy πάνελ (από την εικόνα)
+   ===================================================================== */
+
+/* Φόντο: απαλή διαβάθμιση με "φως" πάνω αριστερά (σταθερό, δεν κυλάει) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(90% 55% at 0% 0%, #FFFFFF 0%, rgba(255, 255, 255, 0) 70%),
+    radial-gradient(70% 45% at 100% 100%, rgba(90, 180, 240, 0.28) 0%, rgba(90, 180, 240, 0) 70%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-deep) 100%);
+}
+html, body { background: var(--bg); }
+body { background: transparent; }
+
+.topbar {
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.topbar h1 { color: var(--text); font-size: 32px; }
+.section-title { font-size: 20px; font-weight: 700; color: var(--text); }
+
+/* Γυάλινες επιφάνειες */
+.list, .stat, .banner, .segmented, .update-banner, .cloud-input,
+.field input, .field select, .hold-btn, .icon-btn, .chip, .btn-quiet {
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.list, .stat, .banner, .update-banner { box-shadow: var(--shadow); }
+.list li + li .row, .list li + li .row-static { border-top-color: var(--line); }
+.row .icon { color: var(--blue); }
+.row-chevron { color: var(--line-strong); }
+
+/* Κουμπιά: navy, στρογγυλεμένα, με σκιά */
+.btn { border-radius: var(--r-md); box-shadow: 0 8px 20px rgba(20, 42, 110, 0.22); }
+.btn-quiet, .btn-danger { box-shadow: none; }
+.btn-quiet { color: var(--text); }
+.btn-danger { background: var(--surface); border: 1px solid var(--glass-edge); }
+.chip.selected { background: var(--navy); border-color: var(--navy); color: #fff; }
+.segmented input:checked + span { background: #fff; color: var(--navy); box-shadow: 0 4px 12px rgba(20, 42, 110, 0.12); }
+.switch { background: var(--line-strong); }
+
+/* Ημερολόγιο */
+.mcell.selected .mnum { background: var(--navy); color: #fff; }
+.mcell.today.selected .mnum { background: var(--blue); color: #fff; }
+.d { background: var(--line-strong); }
+
+/* --- Μπλε κάρτα (σαν την κάρτα της εικόνας): level, XP, Weekly review --- */
+.hero-level, .level, .review-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 20px 20px 18px;
+  border-radius: 26px;
+  background: linear-gradient(140deg, #2B90E4 0%, #1B70CA 55%, #1559B0 100%);
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(27, 112, 202, 0.32);
+  --muted: rgba(255, 255, 255, 0.78);
+  --xp: #FFFFFF;
+  --earn: #FFFFFF;
+  --danger: #FFD1D9;
+  --surface: rgba(255, 255, 255, 0.24);
+}
+/* Οι λεπτοί κύκλοι-διακοσμητικά της κάρτας */
+.hero-level::before, .hero-level::after, .level::before, .level::after, .review-hero::before, .review-hero::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  pointer-events: none;
+}
+.hero-level::before, .level::before, .review-hero::before { width: 260px; height: 260px; right: -90px; top: -120px; }
+.hero-level::after, .level::after, .review-hero::after { width: 200px; height: 200px; right: 30px; bottom: -130px; }
+.hero-level .hero-number strong, .level-number { font-size: 72px; }
+.level-number { color: #fff; }
+.progress span { background: var(--xp); }
+.review-hero { margin-top: 18px; }
+.review-hero .hero-hint { max-width: none; }
+
+.hero-actions { margin-top: 16px; }
+
+/* --- Navy πάνελ (σαν τα "Transactions" της εικόνας): λίστα της Αρχικής,
+       φύλλα, οθόνη του focus. Μέσα τους όλα τα χρώματα γίνονται "σκούρα". --- */
+.home-list, .sheet, .focus-screen {
+  --bg: var(--navy);
+  --surface: rgba(255, 255, 255, 0.08);
+  --surface-press: rgba(255, 255, 255, 0.14);
+  --glass-edge: rgba(255, 255, 255, 0.08);
+  --shadow: none;
+  --line: rgba(255, 255, 255, 0.1);
+  --line-strong: rgba(255, 255, 255, 0.3);
+  --text: #FFFFFF;
+  --muted: #AEBBDD;
+  --accent: #7CC4F7;
+  --primary: var(--blue);
+  --xp: #7CC4F7;
+  --earn: #7CC4F7;
+  --success: #4ADE80;
+  --warning: #FBBF24;
+  --danger: #FB7185;
+  --went: #4ADE80;
+  --left: #FBBF24;
+  --missed: #FB7185;
+  color: var(--text);
+}
+.home-list {
+  margin-top: 26px;
+  padding: 8px 6px;
+  background: var(--navy);
+  border: none;
+  border-radius: 30px;
+  box-shadow: 0 18px 40px rgba(20, 42, 110, 0.28);
+}
+.home-list .row { min-height: 72px; border-radius: 20px; }
+.home-list li + li .row { border-top: none; }
+.home-list .row:active { background: var(--surface-press); }
+/* Εικονίδιο μέσα σε μπλε "πλακίδιο" */
+.home-list .row .icon {
+  width: 46px;
+  height: 46px;
+  padding: 11px;
+  border-radius: 15px;
+  background: var(--blue);
+  color: #fff;
+}
+.home-list .row-title { font-weight: 650; }
+.home-list .row-value { color: #fff; font-weight: 650; }
+
+.sheet {
+  background: var(--navy);
+  border: none;
+  border-radius: 30px;
+  box-shadow: 0 -10px 40px rgba(20, 42, 110, 0.3);
+}
+.sheet-backdrop {
+  background: rgba(15, 32, 80, 0.35);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.focus-screen { background: radial-gradient(120% 70% at 50% 0%, #1C3A8C 0%, var(--navy) 60%); }
+
+/* Κάτω μπάρα: γυαλί */
+.tabbar {
+  background: rgba(255, 255, 255, 0.72);
+  border-top: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: 0 -6px 24px rgba(31, 84, 160, 0.08);
+}
+.tab.active { color: var(--navy); }
+
+/* --- Weekly review: 3 + 2 μετρητές, και λιτή λίστα "By course" --- */
+.stats-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stats-2 { margin-top: 10px; }
+.stats-3 .stat strong { font-size: 26px; }
+.stat span { display: flex; align-items: center; gap: 6px; }
+.sdot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.sdot.went { background: var(--went); }
+.sdot.left { background: var(--left); }
+.sdot.missed { background: var(--missed); }
+
+.course-list {
+  margin: 0;
+  padding: 6px 16px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.course-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+  padding: 9px 0;
+  font-size: 15px;
+}
+.course-list li + li { border-top: 1px solid var(--line); }
+.course-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.course-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.course-bar { grid-column: 1 / -1; height: 4px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.course-bar i { display: block; height: 100%; border-radius: inherit; background: var(--blue); }
+.course-list li.is-short .course-bar i { background: var(--missed); }
+.course-list li.is-short .course-count { color: var(--missed); }
+
+/* --- Focus: λιτό ιστορικό της μέρας --- */
+.compact-list .row-compact { min-height: 48px; padding: 8px 14px; gap: 10px; }
+.row-compact .row-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 15px; }
+.row-meta { flex: none; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.kdot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ec); box-shadow: inset 0 0 0 1.5px rgba(20, 42, 110, 0.25); }
+.kind-homework { --ec: #FBBF24; }
+.lead-seg + .btn { margin-top: 14px; }

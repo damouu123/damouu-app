@@ -313,8 +313,7 @@ register({
   id: 'notifications',
   title: 'Reminders',
   icon: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5a2 2 0 0 0 4 0"/>',
-  order: 60,
-  settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
+  order: 15, // στην Αρχική, εκεί που ήταν το "Today's goal"
 
   homeCard() {
     if (pushEnabled()) return { value: '', label: getLead() ? `Push alerts ${getLead()} min before class` : 'Pick an alert time' };

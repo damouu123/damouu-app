@@ -134,8 +134,7 @@ function legend() {
     <div class="dv-legend" aria-hidden="true">
       <span><i class="lg kind-class"></i>Class</span>
       <span><i class="lg kind-study"></i>Study</span>
-      <span><i class="lg kind-read"></i>Reading</span>
-      <span><i class="lg kind-workout"></i>Workout</span>
+      <span><i class="lg kind-homework"></i>Homework</span>
     </div>`;
 }
 

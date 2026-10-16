@@ -21,7 +21,7 @@ import { getSessions, ACTIVITIES } from './timer.js';
 
 const store = moduleStore('xp');
 
-// Για όσα modules τα χρειάζονται (π.χ. goal.js)
+// Για όσα modules τα χρειάζονται
 export { GOAL_BONUS, GOAL_FOCUS_MIN };
 export const POINTS = CLASS_POINTS;
 
@@ -318,7 +318,7 @@ function renderHomeHero(el) {
     </button>
     <div class="hero-actions">
       <button class="btn" data-go="timer">Start focus</button>
-      <button class="btn btn-quiet" data-go="goal">Today's goal</button>
+      <button class="btn btn-quiet" data-go="notifications">Reminders</button>
     </div>`;
 }
 

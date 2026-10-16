@@ -32,18 +32,23 @@
 
 import { register, emit, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { escapeHtml, icon, navigate, toast, refresh, openSheet } from '../core/router.js';
+import { escapeHtml, icon, navigate, toast, refresh, openSheet, ask } from '../core/router.js';
 import { chime, alarm, haptic, soundArmed, tick as wheelTick } from '../core/feedback.js';
 import { getSetting, setSetting } from '../core/settings.js';
 import { FOCUS_XP_PER_MIN, STOP_PENALTY_XP } from '../core/rules.js';
 
 const store = moduleStore('timer');
 
+// Δραστηριότητες. Όσες έχουν retired: true δεν διαλέγονται πια (θα ξαναμπούν
+// αργότερα), αλλά τις κρατάμε για να φαίνονται σωστά οι παλιές συνεδρίες.
 export const ACTIVITIES = {
   study: { label: 'Exam study', icon: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 1 4 17.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5a1.5 1.5 0 0 0 1.5-1.5z"/>' },
-  read: { label: 'Reading', icon: '<path d="M6 3.5h10.5A1.5 1.5 0 0 1 18 5v15.5H7.5A1.5 1.5 0 0 1 6 19zM6 17.5h12"/>' },
-  workout: { label: 'Workout', icon: '<path d="M3 9.5v5M6 7v10M18 7v10M21 9.5v5M6 12h12"/>' },
+  homework: { label: 'Homework', icon: '<path d="M14.5 4.5l5 5L9 20H4v-5zM12.5 6.5l5 5"/>' },
+  read: { label: 'Reading', retired: true, icon: '<path d="M6 3.5h10.5A1.5 1.5 0 0 1 18 5v15.5H7.5A1.5 1.5 0 0 1 6 19zM6 17.5h12"/>' },
+  workout: { label: 'Workout', retired: true, icon: '<path d="M3 9.5v5M6 7v10M18 7v10M21 9.5v5M6 12h12"/>' },
 };
+const CHOOSABLE = Object.keys(ACTIVITIES).filter((id) => !ACTIVITIES[id].retired);
+const activity = (id) => ACTIVITIES[id] || { label: 'Focus', icon: ACTIVITIES.study.icon };
 
 // Ανταμοιβή: XP ανά λεπτό ολοκληρωμένου focus (κανόνες στο core/rules.js)
 export const earnedFor = (minutes) => minutes * FOCUS_XP_PER_MIN;
@@ -238,7 +243,7 @@ function renderRunning() {
   overlay.dataset.view = 'running';
   overlay.innerHTML = `
     <div class="focus-inner running">
-      <p class="focus-activity">${icon(ACTIVITIES[a.activity].icon)} ${ACTIVITIES[a.activity].label}</p>
+      <p class="focus-activity">${icon(activity(a.activity).icon)} ${activity(a.activity).label}</p>
       <div class="ring">
         <svg viewBox="0 0 240 240" aria-hidden="true">
           <circle class="ring-track" cx="120" cy="120" r="${RING_R}"/>
@@ -377,7 +382,7 @@ function renderRinging(session) {
   overlay.dataset.view = 'ringing';
   overlay.innerHTML = `
     <div class="focus-inner running">
-      <p class="focus-activity">${icon(ACTIVITIES[session.activity].icon)} ${ACTIVITIES[session.activity].label}</p>
+      <p class="focus-activity">${icon(activity(session.activity).icon)} ${activity(session.activity).label}</p>
       <p class="alarm-title">Time's up</p>
       <p class="muted">${session.minutes} ${session.minutes === 1 ? 'minute' : 'minutes'} done</p>
     </div>
@@ -448,7 +453,7 @@ function renderResult(session) {
     <div class="focus-inner">
       <p class="hero-label">Session complete</p>
       <p class="hero-number"><strong>+${session.earned}</strong><span>XP</span></p>
-      <p>${session.minutes} minutes of ${ACTIVITIES[session.activity].label.toLowerCase()}.
+      <p>${session.minutes} minutes of ${activity(session.activity).label.toLowerCase()}.
         Nice work.</p>
       <div class="stack"><button class="btn btn-block" data-done>Done</button></div>
     </div>`;
@@ -501,6 +506,25 @@ function sessionValue(s) {
     : { text: 'Stopped', cls: 'muted', sub: '' };
 }
 
+// Διαγραφή συνεδρίας (π.χ. καταγράφηκε λάθος). Τα XP της (ή η ποινή της)
+// φεύγουν μαζί της, αφού τα XP υπολογίζονται από τις συνεδρίες.
+async function deleteSession(id, after) {
+  const s = getSessions().find((x) => x.id === id);
+  if (!s) return;
+  const v = sessionValue(s);
+  const effect = s.completed ? `You lose its ${s.earned} XP.` : s.penalty ? `Its −${s.penalty} XP penalty is removed too.` : '';
+  const yes = await ask({
+    title: 'Delete this session?',
+    text: `${activity(s.activity).label}, ${clock(s.startedAt)}, ${s.minutes} min (${v.text}). ${effect}`,
+    confirmLabel: 'Delete',
+  });
+  if (!yes) return;
+  store.update('sessions', (list) => list.filter((x) => x.id !== id), []);
+  emit('focus:deleted', s);
+  toast('Session deleted');
+  after();
+}
+
 // 90 -> "1 h 30 min", 120 -> "2 h"
 const hoursText = (m) => (m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`);
 
@@ -510,7 +534,7 @@ function render(el) {
   const saved = store.get('last', null);
   if (!choice) {
     choice = {
-      activity: saved && ACTIVITIES[saved.activity] ? saved.activity : 'study',
+      activity: saved && CHOOSABLE.includes(saved.activity) ? saved.activity : 'study',
       minutes: Math.min(MAX_MIN, Math.max(MIN_MIN, Number(saved && saved.minutes) || 30)),
     };
   }
@@ -518,9 +542,9 @@ function render(el) {
 
   el.innerHTML = `
     <div class="segmented" role="radiogroup" aria-label="Activity">
-      ${Object.entries(ACTIVITIES).map(([id, a]) => `
+      ${CHOOSABLE.map((id) => `
         <label><input type="radio" name="activity" value="${id}" ${choice.activity === id ? 'checked' : ''}>
-          <span>${a.label}</span></label>`).join('')}
+          <span>${ACTIVITIES[id].label}</span></label>`).join('')}
     </div>
 
     <div class="wheel" tabindex="0" role="slider" aria-label="Minutes"
@@ -544,18 +568,18 @@ function render(el) {
 
     ${today.length ? `
       <h2 class="section-title">Today</h2>
-      <ul class="list">${today.map((s) => {
+      <ul class="list compact-list">${today.map((s) => {
         const v = sessionValue(s);
         return `
-        <li><div class="row row-static">
-          <span class="row-text">
-            <span class="row-title">${escapeHtml(ACTIVITIES[s.activity].label)}</span>
-            <span class="row-sub">${clock(s.startedAt)}, ${s.minutes} min${v.sub}</span>
-          </span>
-          <span class="row-value ${v.cls}">${v.text}</span>
-        </div></li>`;
+        <li><button class="row row-compact" data-session="${s.id}" aria-label="${escapeHtml(activity(s.activity).label)}, ${clock(s.startedAt)}, ${s.minutes} min. Delete">
+          <i class="kdot kind-${s.activity}" aria-hidden="true"></i>
+          <span class="row-title">${escapeHtml(activity(s.activity).label)}</span>
+          <span class="row-meta">${clock(s.startedAt)} · ${s.minutes}′${v.sub ? ' · ' + v.sub.replace(/^, /, '') : ''}</span>
+          <span class="row-value small-value ${v.cls}">${v.text}</span>
+        </button></li>`;
       }).join('')}
-      </ul>` : ''}`;
+      </ul>
+      <p class="muted small-print">Tap a session to delete it.</p>` : ''}`;
 
   // ---------- Ο τροχός ----------
   // Κάθε λεπτό είναι μια γραμμή ύψους ITEM_H. Με scroll-snap ο browser
@@ -675,6 +699,7 @@ function render(el) {
     if (!b) return;
     if (b.dataset.minutes) goTo(Number(b.dataset.minutes));
     else if ('start' in b.dataset) start(choice.activity, choice.minutes);
+    else if (b.dataset.session) deleteSession(b.dataset.session, () => render(el));
   };
 }
 

@@ -80,7 +80,7 @@ function render(el) {
   const s = weekStats(ws);
   const p = weekStats(addDays(ws, -7));
   const { range, rel } = weekHeading([ws, addDays(ws, 4)]);
-  const went = s.attended + s.left; // "πήγες" = Went + Left early (εμφανίστηκες)
+  const went = s.attended + s.left; // εμφανίστηκες = Went + Left early
 
   const hero = s.rate === null
     ? `<p class="hero-label">Attendance</p>
@@ -102,14 +102,12 @@ function render(el) {
 
   const courses = s.courses.length
     ? `<h2 class="section-title">By course</h2>
-       <ul class="list">${s.courses.map((c) => `
-        <li><div class="row row-static">
-          <span class="row-text">
-            <span class="row-title">${escapeHtml(c.title)}</span>
-            <span class="row-sub">${c.shown} of ${c.total}</span>
-          </span>
-          <span class="row-value ${c.shown < c.total ? 'is-low' : ''}">${pct(c.shown / c.total)}%</span>
-        </div></li>`).join('')}</ul>`
+       <ul class="course-list">${s.courses.map((c) => `
+        <li class="${c.shown < c.total ? 'is-short' : ''}">
+          <span class="course-name">${escapeHtml(c.title)}</span>
+          <span class="course-count">${c.shown}/${c.total}</span>
+          <span class="course-bar" aria-hidden="true"><i style="width:${pct(c.shown / c.total)}%"></i></span>
+        </li>`).join('')}</ul>`
     : '';
 
   el.innerHTML = `
@@ -124,9 +122,12 @@ function render(el) {
     <section class="hero review-hero">${hero}</section>
     ${reminder}
 
-    <div class="stats">
-      <div class="stat"><strong>${went}</strong><span>Went</span></div>
-      <div class="stat"><strong class="${s.missed ? 'is-low' : ''}">${s.missed}</strong><span>Missed</span></div>
+    <div class="stats stats-3">
+      <div class="stat"><strong>${s.attended}</strong><span><i class="sdot went"></i>Went</span></div>
+      <div class="stat"><strong>${s.left}</strong><span><i class="sdot left"></i>Left early</span></div>
+      <div class="stat"><strong class="${s.missed ? 'is-low' : ''}">${s.missed}</strong><span><i class="sdot missed"></i>Missed</span></div>
+    </div>
+    <div class="stats stats-2">
       <div class="stat"><strong class="xp-plus">+${s.xp}</strong><span>XP</span></div>
       <div class="stat"><strong>${s.streak}</strong><span>Streak</span></div>
     </div>
