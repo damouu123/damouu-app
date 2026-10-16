@@ -4,8 +4,8 @@
 //   Home     οι προπονήσεις σου, η πιο πρόσφατη πρώτη (#/fitness, #/fitness/w/<id>)
 //   Workout  Start Empty Workout και τα routines σου (#/workout, #/workout/routine/<id|new>)
 //   Profile  σύνολα, γράφημα (7 μέρες / μήνας / 3 μήνες) και Dashboard: Statistics, Exercises,
-//            Measures, Calendar (#/profile, #/profile/<σελίδα>), και από κάτω αναλυτικό
-//            ιστορικό: κάθε προπόνηση με όλα τα σετ (κιλά × επαναλήψεις)
+//            Measures, Calendar (#/profile, #/profile/<σελίδα>), και από κάτω "Workouts":
+//            κάρτες σαν του Hevy που ανοίγουν με όλα τα σετ (κιλά × επαναλήψεις)
 //
 // Δεδομένα: όσα του workout.js (moduleStore('workout')) και
 //   measures  [{ date: "2026-10-16", weight: 78.5 }]  το βάρος σου
@@ -484,7 +484,7 @@ function renderProfile(el, params) {
       ${tile('profile/calendar', MORE_ICONS.calendar, 'Calendar')}
     </div>
 
-    <h2 class="section-title">History</h2>
+    <h2 class="section-title">Workouts</h2>
     <div id="ft-history">${historyHtml()}</div>`;
 
   el.onclick = (ev) => {
@@ -493,8 +493,10 @@ function renderProfile(el, params) {
     if ('more' in b.dataset) {
       historyShown += HISTORY_PAGE;
       el.querySelector('#ft-history').innerHTML = historyHtml();
-    } else if (b.dataset.open) {
-      navigate(`fitness/w/${b.dataset.open}`);
+    } else if (b.dataset.expand) {
+      const id = b.dataset.expand;
+      if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+      el.querySelector('#ft-history').innerHTML = historyHtml();
     } else if ('rangeOpen' in b.dataset) {
       rangeSheet(() => {
         picked = null;
@@ -514,41 +516,67 @@ function renderProfile(el, params) {
   };
 }
 
-// ----- Αναλυτικό ιστορικό: κάθε προπόνηση με όλα τα σετ -----
+// ----- Workouts (σαν το Profile του Hevy): κάρτες, που "ανοίγουν" με όλα τα σετ -----
 const HISTORY_PAGE = 10; // πόσες προπονήσεις φαίνονται, και πόσες ακόμα με "Show more"
 let historyShown = HISTORY_PAGE;
+const expanded = new Set(); // ποιες κάρτες είναι ανοιχτές
+
+// "Today", "Yesterday", αλλιώς "Friday, 9 Oct 2026"
+function dayLabel(ts) {
+  const days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(ts).setHours(0, 0, 0, 0)) / DAY);
+  if (days === 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  return new Date(ts).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function setsTable(e) {
+  let n = 0;
+  return `
+    <table class="ft-hist-sets">
+      <thead><tr><th>Set</th><th>kg</th><th>Reps</th><th>Volume</th></tr></thead>
+      <tbody>${e.sets.map((s) => `
+        <tr><td><span class="wk-type t-${s.type}">${SET_TYPES[s.type]?.short || String(++n)}</span></td>
+          <td>${s.kg ? fmtKg(s.kg) : '–'}</td><td>${s.reps}</td><td>${s.kg ? fmtKg(s.kg * s.reps) : '–'}</td></tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function historyCard(w) {
+  const open = expanded.has(w.id);
+  const shown = open ? w.exercises : w.exercises.slice(0, SHOWN_EXERCISES);
+  const more = w.exercises.length - SHOWN_EXERCISES;
+  const records = recordsOf(w);
+  return `
+    <li class="ft-card ft-hist-card ${open ? 'open' : ''}">
+      <button class="ft-hist-toggle" data-expand="${w.id}" aria-expanded="${open}">
+        <span class="ft-hist-when"><span class="ft-profile-dot">${icon(ICONS.dumbbell)}</span>
+          <span class="muted">${dayLabel(w.startedAt)}, ${new Date(w.startedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span></span>
+        <span class="ft-card-title">${escapeHtml(w.name)}</span>
+        <span class="ft-card-stats">
+          <span><small>Time</small>${durationText(w.endedAt - w.startedAt)}</span>
+          <span><small>Volume</small>${fmtVolume(volumeOf(w.exercises))}</span>
+          <span><small>Records</small><b>${records ? `<span class="ft-medal">${icon(MORE_ICONS.medal)}</span>${records}` : '0'}</b></span>
+        </span>
+      </button>
+      <div class="ft-card-ex">${shown.map((e) => {
+        const ex = exById(e.exerciseId);
+        return `
+        <div class="ft-hist-row">
+          <span class="ft-hist-line">${exAvatar(ex)}<span>${e.sets.length} ${e.sets.length === 1 ? 'set' : 'sets'} ${escapeHtml(exTitle(ex))}</span></span>
+          ${open ? setsTable(e) : ''}
+        </div>`;
+      }).join('')}</div>
+      ${more > 0 || open ? `<button class="ft-card-more muted" data-expand="${w.id}">${open ? 'Show less' : `See ${more} more ${more === 1 ? 'exercise' : 'exercises'} and all sets`}</button>`
+        : `<button class="ft-card-more muted" data-expand="${w.id}">See all sets</button>`}
+    </li>`;
+}
 
 function historyHtml() {
   const hist = getHistory().slice().reverse();
   if (!hist.length) return '<p class="muted small-print">Your finished workouts will show up here with every set.</p>';
   return `
-    <ul class="ft-history">${hist.slice(0, historyShown).map((w) => `
-      <li class="ft-hist">
-        <button class="ft-hist-head" data-open="${w.id}">
-          <span class="ft-hist-title"><strong>${escapeHtml(w.name)}</strong>
-            <span class="muted">${new Date(w.startedAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })},
-              ${new Date(w.startedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span></span>
-          <span class="ft-hist-sum">${durationText(w.endedAt - w.startedAt)} · ${fmtVolume(volumeOf(w.exercises))} · ${setsCount(w.exercises)} sets</span>
-        </button>
-        ${w.exercises.map((e) => {
-          let n = 0;
-          const reps = e.sets.reduce((m, s) => m + (s.reps || 0), 0);
-          return `
-          <div class="ft-hist-ex">
-            <p class="ft-hist-ex-name">${escapeHtml(exTitle(exById(e.exerciseId)))}
-              <span class="muted">${e.sets.length} ${e.sets.length === 1 ? 'set' : 'sets'}, ${reps} reps, ${fmtVolume(volumeOf([e]))}</span></p>
-            <table class="ft-hist-sets">
-              <thead><tr><th>Set</th><th>kg</th><th>Reps</th><th>Volume</th></tr></thead>
-              <tbody>${e.sets.map((s) => `
-                <tr><td><span class="wk-type t-${s.type}">${SET_TYPES[s.type]?.short || String(++n)}</span></td>
-                  <td>${s.kg ? fmtKg(s.kg) : '–'}</td><td>${s.reps}</td><td>${s.kg ? fmtKg(s.kg * s.reps) : '–'}</td></tr>`).join('')}
-              </tbody>
-            </table>
-          </div>`;
-        }).join('')}
-      </li>`).join('')}
-    </ul>
-    ${hist.length > historyShown ? `<button class="btn btn-quiet btn-block" data-more>Show more (${hist.length - historyShown})</button>` : ''}`;
+    <ul class="ft-feed">${hist.slice(0, historyShown).map(historyCard).join('')}</ul>
+    ${hist.length > historyShown ? `<button class="btn btn-quiet btn-block ft-more" data-more>Show more (${hist.length - historyShown})</button>` : ''}`;
 }
 
 // ----- Statistics: σετ ανά μυϊκή ομάδα (30 μέρες) -----
@@ -748,5 +776,5 @@ register({
   nav: true,
   home: false,
   render: renderProfile,
-  unmount() { calMonth = null; historyShown = HISTORY_PAGE; picked = null; },
+  unmount() { calMonth = null; historyShown = HISTORY_PAGE; picked = null; expanded.clear(); },
 });
