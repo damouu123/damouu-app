@@ -4,7 +4,8 @@
 //   Home     οι προπονήσεις σου, η πιο πρόσφατη πρώτη (#/fitness, #/fitness/w/<id>)
 //   Workout  Start Empty Workout και τα routines σου (#/workout, #/workout/routine/<id|new>)
 //   Profile  σύνολα, γράφημα (7 μέρες / μήνας / 3 μήνες) και Dashboard: Statistics, Exercises,
-//            Measures, Calendar (#/profile, #/profile/<σελίδα>)
+//            Measures, Calendar (#/profile, #/profile/<σελίδα>), και από κάτω αναλυτικό
+//            ιστορικό: κάθε προπόνηση με όλα τα σετ (κιλά × επαναλήψεις)
 //
 // Δεδομένα: όσα του workout.js (moduleStore('workout')) και
 //   measures  [{ date: "2026-10-16", weight: 78.5 }]  το βάρος σου
@@ -454,12 +455,20 @@ function renderProfile(el, params) {
       ${tile('profile/exercises', ICONS.dumbbell, 'Exercises')}
       ${tile('profile/measures', MORE_ICONS.measure, 'Measures')}
       ${tile('profile/calendar', MORE_ICONS.calendar, 'Calendar')}
-    </div>`;
+    </div>
+
+    <h2 class="section-title">History</h2>
+    <div id="ft-history">${historyHtml()}</div>`;
 
   el.onclick = (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
-    if ('rangeOpen' in b.dataset) {
+    if ('more' in b.dataset) {
+      historyShown += HISTORY_PAGE;
+      el.querySelector('#ft-history').innerHTML = historyHtml();
+    } else if (b.dataset.open) {
+      navigate(`fitness/w/${b.dataset.open}`);
+    } else if ('rangeOpen' in b.dataset) {
       rangeSheet(() => {
         el.querySelector('#ft-chart').innerHTML = chartHtml();
         b.innerHTML = `${RANGES[range].label} ${icon(MORE_ICONS.caret)}`;
@@ -470,6 +479,43 @@ function renderProfile(el, params) {
       el.querySelectorAll('[data-metric]').forEach((c) => { c.classList.toggle('selected', c === b); c.setAttribute('aria-checked', c === b); });
     } else if (b.dataset.go) navigate(b.dataset.go);
   };
+}
+
+// ----- Αναλυτικό ιστορικό: κάθε προπόνηση με όλα τα σετ -----
+const HISTORY_PAGE = 10; // πόσες προπονήσεις φαίνονται, και πόσες ακόμα με "Show more"
+let historyShown = HISTORY_PAGE;
+
+function historyHtml() {
+  const hist = getHistory().slice().reverse();
+  if (!hist.length) return '<p class="muted small-print">Your finished workouts will show up here with every set.</p>';
+  return `
+    <ul class="ft-history">${hist.slice(0, historyShown).map((w) => `
+      <li class="ft-hist">
+        <button class="ft-hist-head" data-open="${w.id}">
+          <span class="ft-hist-title"><strong>${escapeHtml(w.name)}</strong>
+            <span class="muted">${new Date(w.startedAt).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })},
+              ${new Date(w.startedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span></span>
+          <span class="ft-hist-sum">${durationText(w.endedAt - w.startedAt)} · ${fmtVolume(volumeOf(w.exercises))} · ${setsCount(w.exercises)} sets</span>
+        </button>
+        ${w.exercises.map((e) => {
+          let n = 0;
+          const reps = e.sets.reduce((m, s) => m + (s.reps || 0), 0);
+          return `
+          <div class="ft-hist-ex">
+            <p class="ft-hist-ex-name">${escapeHtml(exTitle(exById(e.exerciseId)))}
+              <span class="muted">${e.sets.length} ${e.sets.length === 1 ? 'set' : 'sets'}, ${reps} reps, ${fmtVolume(volumeOf([e]))}</span></p>
+            <table class="ft-hist-sets">
+              <thead><tr><th>Set</th><th>kg</th><th>Reps</th><th>Volume</th></tr></thead>
+              <tbody>${e.sets.map((s) => `
+                <tr><td><span class="wk-type t-${s.type}">${SET_TYPES[s.type]?.short || String(++n)}</span></td>
+                  <td>${s.kg ? fmtKg(s.kg) : '–'}</td><td>${s.reps}</td><td>${s.kg ? fmtKg(s.kg * s.reps) : '–'}</td></tr>`).join('')}
+              </tbody>
+            </table>
+          </div>`;
+        }).join('')}
+      </li>`).join('')}
+    </ul>
+    ${hist.length > historyShown ? `<button class="btn btn-quiet btn-block" data-more>Show more (${hist.length - historyShown})</button>` : ''}`;
 }
 
 // ----- Statistics: σετ ανά μυϊκή ομάδα (30 μέρες) -----
@@ -669,5 +715,5 @@ register({
   nav: true,
   home: false,
   render: renderProfile,
-  unmount() { calMonth = null; },
+  unmount() { calMonth = null; historyShown = HISTORY_PAGE; },
 });

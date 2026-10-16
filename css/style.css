@@ -2382,3 +2382,28 @@ button.ft-range .icon { width: 18px; height: 18px; }
 /* Τροχός ξεκούρασης μέσα στο φύλλο */
 .wk-rest-wheel .wheel { margin-top: 14px; }
 .wk-routine-list .wk-rest-chip { align-self: flex-start; }
+
+/* Αναλυτικό ιστορικό στο Profile */
+.ft-history { display: grid; gap: 14px; margin: 0 0 14px; padding: 0; list-style: none; }
+.ft-hist {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.ft-hist-head { display: grid; gap: 4px; width: 100%; padding: 0 2px 10px; border: none; border-bottom: 1px solid var(--line); background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.ft-hist-title { display: grid; }
+.ft-hist-title strong { font-size: 18px; }
+.ft-hist-title .muted { font-size: 13px; }
+.ft-hist-sum { font-size: 14px; font-weight: 650; color: var(--blue); }
+.ft-hist-ex { margin-top: 12px; }
+.ft-hist-ex-name { display: grid; margin: 0 2px 6px; font-weight: 700; }
+.ft-hist-ex-name .muted { font-size: 13px; font-weight: 500; }
+.ft-hist-sets { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+.ft-hist-sets th { padding: 0 6px 4px; font-size: 12px; font-weight: 650; color: var(--muted); text-transform: uppercase; text-align: center; }
+.ft-hist-sets td { padding: 4px 6px; text-align: center; border-top: 1px solid var(--line); font-weight: 600; }
+.ft-hist-sets th:first-child, .ft-hist-sets td:first-child { width: 44px; text-align: left; }
+.ft-hist-sets .wk-type { width: 26px; height: 26px; font-size: 14px; cursor: default; }
