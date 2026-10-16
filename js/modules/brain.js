@@ -4,8 +4,10 @@
 //   Went         κάθε 5 μαθήματα που πήγες, μεγαλώνει ένα "stage"
 //   Left early   κουράζεται
 //   Missed       αρχίζει να σκουριάζει
-//   Η κούραση και η σκουριά αφορούν τα τελευταία 6 μαθήματα: όσο πηγαίνεις,
-//   "ξεθωριάζουν". Αν πας σε όλα τα τελευταία, είναι χαρούμενο.
+//   Όλα κρίνονται από ΟΛΑ τα μαθήματα που έχεις δηλώσει (όχι από τη μέρα ή
+//   τα πρόσφατα): η σκουριά από το ποσοστό των Missed, η κούραση από το
+//   ποσοστό των Left early. Όσο πηγαίνεις, τα ποσοστά πέφτουν και ξεθωριάζουν.
+//   Αν σχεδόν όλα είναι Went, είναι χαρούμενο.
 //   Τα cancelled δεν μετράνε.
 //
 // Δεν αποθηκεύει τίποτα για το μυαλό: όλα υπολογίζονται από τις παρουσίες.
@@ -24,7 +26,10 @@ import { validAttendance } from './calendar.js';
 const store = moduleStore('brain');
 
 const GROW_EVERY = 5;   // μαθήματα (Went) για κάθε μεγάλωμα
-const RECENT = 6;       // πόσα πρόσφατα μαθήματα κρίνουν κούραση/σκουριά
+// Από ποιο ποσοστό (στο σύνολο των μαθημάτων) ξεκινά κάθε επίπεδο
+const RUST_AT = [0.05, 0.15, 0.3];  // Missed: σκουριά 1, 2, 3
+const TIRED_AT = [0.1, 0.25];       // Left early: κούραση 1, 2
+const levelOf = (rate, steps) => steps.filter((s) => rate >= s).length;
 const MAX_STAGE_SIZE = 10; // μετά από αυτό το stage δεν μεγαλώνει άλλο στην οθόνη
 
 // ===================== Υπολογισμός =====================
@@ -55,20 +60,25 @@ export function streakUntil(toKey) {
 }
 
 export function brainState(records = countedRecords()) {
-  const went = records.filter((r) => r.status === 'attended').length;
-  const recent = records.slice(-RECENT);
-  const rust = Math.min(3, recent.filter((r) => r.status === 'missed').length);
-  const tired = Math.min(2, recent.filter((r) => r.status === 'left').length);
-  const allWent = recent.length > 0 && recent.every((r) => r.status === 'attended');
+  const total = records.length;
+  const count = (s) => records.filter((r) => r.status === s).length;
+  const went = count('attended');
+  const missRate = total ? count('missed') / total : 0;
+  const leftRate = total ? count('left') / total : 0;
+  const rust = levelOf(missRate, RUST_AT);
+  const tired = levelOf(leftRate, TIRED_AT);
   const mood = rust >= 2 ? 'rusty'
     : tired ? 'tired'
       : rust ? 'worried'
-        : allWent ? 'happy' : 'calm';
+        : went ? 'happy' : 'calm';
   const { current, best } = streaks(records);
   return {
     went,
     stage: Math.floor(went / GROW_EVERY),
     into: went % GROW_EVERY, // πόσα μαθήματα μέσα στο τωρινό stage
+    total,
+    missRate,
+    leftRate,
     rust,
     tired,
     mood,
@@ -164,6 +174,8 @@ function renderHomeHero(el) {
     </div>`;
 }
 
+const pctText = (rate) => `${Math.round(rate * 100)}%`;
+
 function render(el) {
   const s = brainState();
   const rule = (title, sub) => `
@@ -180,7 +192,7 @@ function render(el) {
       ${rule('Went', `Every ${GROW_EVERY} classes your brain grows.`)}
       ${rule('Left early', 'Your brain gets tired.')}
       ${rule('Missed', 'Your brain starts to rust.')}
-      ${rule('Going back', `Tiredness and rust come from your last ${RECENT} classes, so they fade as you keep going.`)}
+      ${rule('Overall', `It looks at all your classes, not just today. Right now: ${pctText(s.missRate)} missed, ${pctText(s.leftRate)} left early. The more you go, the more rust and tiredness fade.`)}
     </ul>`;
 }
 
