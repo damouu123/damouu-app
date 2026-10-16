@@ -82,6 +82,18 @@ export function initUpdates() {
   });
 }
 
+// Η έκδοση που ΤΡΕΧΕΙ τώρα (τη λέει ο service worker). null αν δεν απαντήσει.
+export function runningVersion() {
+  const sw = 'serviceWorker' in navigator && navigator.serviceWorker.controller;
+  if (!sw) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => resolve(null), 1500);
+    channel.port1.onmessage = (ev) => { clearTimeout(timer); resolve(ev.data); };
+    sw.postMessage('VERSION', [channel.port2]);
+  });
+}
+
 // Για το κουμπί "Check for updates". Επιστρέφει:
 //   'updating'    βρέθηκε νέα έκδοση και εφαρμόζεται (η σελίδα θα ξαναφορτώσει)
 //   'latest'      έχεις ήδη την τελευταία

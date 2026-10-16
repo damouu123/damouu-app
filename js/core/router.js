@@ -6,7 +6,7 @@
 import { allModules, getModule } from './registry.js';
 import { getSetting, setSetting } from './settings.js';
 import { haptic } from './feedback.js';
-import { checkForUpdates } from './updates.js';
+import { checkForUpdates, runningVersion } from './updates.js';
 
 const view = () => document.getElementById('view');
 let current = null; // το module που φαίνεται τώρα
@@ -268,12 +268,11 @@ function renderSettings(el) {
     }[result]);
   });
 
-  // Η έκδοση γράφεται μόνο στο sw.js: τη διαβάζουμε από εκεί (δουλεύει και offline)
-  fetch('sw.js').then((r) => r.text()).then((src) => {
-    const v = src.match(/VERSION = '([^']+)'/);
+  // Η έκδοση που τρέχει: τη ρωτάμε από τον service worker (όχι από το internet)
+  runningVersion().then((v) => {
     const out = el.querySelector('#app-version');
-    if (v && out) out.textContent = `Discipline ${v[1]} installed`;
-  }).catch(() => {});
+    if (out) out.textContent = v ? `Discipline ${v} installed` : 'Discipline (old version, tap to update)';
+  });
 }
 
 function renderTabbar(activeId) {

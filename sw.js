@@ -4,7 +4,7 @@
 //
 // ΣΗΜΑΝΤΙΚΟ: Κάθε φορά που αλλάζεις οποιοδήποτε αρχείο, ανέβασε το VERSION.
 // Έτσι το iPhone καταλαβαίνει ότι υπάρχει νέα έκδοση.
-const VERSION = 'v38';
+const VERSION = 'v39';
 const CACHE = `discipline-${VERSION}`;
 
 // Όλα τα αρχεία του app (σχετικά paths, για να δουλεύει σε GitHub Pages υποφάκελο)
@@ -35,9 +35,11 @@ const ASSETS = [
   './icons/icon-512.png',
 ];
 
-// 1) Εγκατάσταση: κατεβάζουμε όλα τα αρχεία στην cache
+// 1) Εγκατάσταση: κατεβάζουμε όλα τα αρχεία στην cache.
+// cache: 'reload' = πάντα από το GitHub, ΟΧΙ από την προσωρινή μνήμη του browser
+// (αλλιώς, σε ενημέρωση λίγα λεπτά μετά την προηγούμενη, έμπαιναν παλιά αρχεία).
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })))));
 });
 
 // 2) Ενεργοποίηση: σβήνουμε τις παλιές εκδόσεις της cache
@@ -50,8 +52,10 @@ self.addEventListener('activate', (event) => {
 });
 
 // Το app στέλνει αυτό το μήνυμα όταν πατάς "Ανανέωση"
+// και ρωτάει "ποια έκδοση τρέχει;" για τις Ρυθμίσεις
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data === 'VERSION' && event.ports[0]) event.ports[0].postMessage(VERSION);
 });
 
 // 3) Push ειδοποίηση από τον server (server/worker.js)
