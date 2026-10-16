@@ -19,6 +19,7 @@ import { moduleStore } from '../core/storage.js';
 import { navigate, toast, ask, openSheet } from '../core/router.js';
 import {
   pushSupported, pushConfigured, pushEnabled, pushStatus, enablePush, disablePush, testPush, LEAD_MIN,
+  startTestClass, getTestClass,
 } from './push.js';
 import {
   getSchedule, entriesForDate, gapsForDate, startOfDay, addDays, weekday, dateKey, parseKey,
@@ -171,6 +172,17 @@ on('attendance:changed', ({ date, id, status }) => {
 
 // ===================== Οθόνη =====================
 
+function testLine() {
+  const t = getTestClass();
+  if (!t) return '';
+  const time = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const text = t.status ? 'Test class marked. Done'
+    : Date.now() < t.startsAt - LEAD_MIN * 60000 ? `Test class at ${time(t.startsAt)}. First alert in about a minute, the "Did you go?" alert after ${time(t.endsAt)}`
+    : Date.now() < t.endsAt ? `Test class at ${time(t.startsAt)}. The "Did you go?" alert comes after ${time(t.endsAt)}`
+    : 'Test class ended. Alerts repeat every 30 min until you mark it';
+  return `<p class="muted small-print">${text}.</p>`;
+}
+
 function pushSection() {
   if (!pushConfigured()) {
     return '<p class="muted small-print">Not connected to a reminder server yet.</p>';
@@ -191,7 +203,9 @@ function pushSection() {
       ${error ? `<span class="row-value small-value is-low">${error}</span>`
         : `<span class="row-value small-value earned">${lastSync ? 'Synced' : 'Waiting'}</span>`}
     </div></li></ul>
-    <button class="btn btn-quiet btn-block" data-push-test>Send a test alert</button>
+    ${testLine()}
+    <button class="btn btn-quiet btn-block" data-push-class>Try with a test class</button>
+    <button class="link-btn centered" data-push-test>Send a test alert</button>
     <button class="link-btn centered" data-push-off>Turn off</button>`;
 }
 
@@ -262,6 +276,12 @@ function render(el) {
       b.disabled = true;
       const result = await enablePush();
       toast({ ok: 'Reminders are on. A test alert is on its way', denied: 'Notifications are blocked. Allow them in iPhone Settings', unsupported: 'Add the app to your Home Screen first' }[result] || result);
+      render(el);
+      return;
+    }
+    if ('pushClass' in b.dataset) {
+      b.disabled = true;
+      toast((await startTestClass()) ? 'Test class added. Lock your phone and wait about a minute' : 'Could not reach the reminder server');
       render(el);
       return;
     }

@@ -382,12 +382,13 @@ function renderMonth(el) {
 function openFromLink(el, key) {
   const date = parseKey(key.split('|')[0]);
   history.replaceState(null, '', '#/calendar'); // ώστε ένα refresh να μην το ξανανοίγει
-  if (Number.isNaN(date.getTime())) { renderMonth(el); return; }
+  if (Number.isNaN(date.getTime())) { renderMonth(el); emit('calendar:link', key); return; }
   selected = startOfDay(date);
   shownMonth = new Date(date.getFullYear(), date.getMonth(), 1);
   renderMonth(el);
   const entry = entriesForDate(date).find((x) => x.key === key);
   if (entry) openClassSheet(entry, () => renderMonth(el));
+  else emit('calendar:link', key); // π.χ. το δοκιμαστικό μάθημα των ειδοποιήσεων (push.js)
 }
 
 // Η προβολή ημέρας (dayview.js) δηλώνει εδώ τον εαυτό της όταν φορτωθεί.
