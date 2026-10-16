@@ -19,7 +19,8 @@
 //   enabled   αν είναι ανοιχτές οι ειδοποιήσεις
 //   lastSync  πότε ενημερώθηκε τελευταία φορά ο server (ms)
 //   error     τελευταίο σφάλμα (ή null)
-//   lead      πόσα λεπτά πριν από το μάθημα έρχεται η ειδοποίηση (10/20/40/60)
+//   lead      πόσα λεπτά πριν από το μάθημα έρχεται η ειδοποίηση (10/20/40/60).
+//             null = δεν έχεις πατήσει Save ακόμα: ο server δεν στέλνει τίποτα
 
 import { on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
@@ -34,7 +35,7 @@ const DAYS_AHEAD = 14;
 const NAG_WINDOW_MS = 48 * 3600000; // ίδιο με τον server
 export const LEADS = [10, 20, 40, 60];
 export const NAG_EVERY_MIN = 10; // ίδιο με τον server
-export const getLead = () => store.get('lead', 20);
+export const getLead = () => store.get('lead', null);
 
 store.remove('test'); // το δοκιμαστικό μάθημα της v38 δεν υπάρχει πια
 
@@ -112,18 +113,19 @@ async function subscription(create) {
 }
 
 // Πρέπει να καλείται ΜΕΣΑ σε πάτημα (το iPhone ζητά άδεια μόνο τότε).
+// Χωρίς ειδοποίηση: τίποτα δεν στέλνεται μέχρι να διαλέξεις χρόνο και να πατήσεις Save.
 // Επιστρέφει 'ok' | 'denied' | 'unsupported' | μήνυμα σφάλματος
 export async function enablePush() {
   if (!pushSupported() || !pushConfigured()) return 'unsupported';
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return 'denied';
+  store.remove('lead');
   try {
     const sub = await subscription(true);
     await post('/sync', { key: appKey(), subscription: sub.toJSON(), ...syncBody() });
     store.set('enabled', true);
     store.set('lastSync', Date.now());
     store.set('error', null);
-    await post('/test', { key: appKey() });
     return 'ok';
   } catch (err) {
     store.set('error', errorText(err));
@@ -148,7 +150,8 @@ export async function setLead(minutes) {
 
 export async function disablePush() {
   store.set('enabled', false);
-  try { await post('/sync', { key: appKey(), classes: [] }); } catch { /* χωρίς σύνδεση: ο server απλώς δεν θα ξέρει μαθήματα */ }
+  store.remove('lead'); // την επόμενη φορά διαλέγεις ξανά χρόνο
+  try { await post('/sync', { key: appKey(), classes: [], lead: null }); } catch { /* χωρίς σύνδεση: ο server απλώς δεν θα ξέρει μαθήματα */ }
   try { const sub = await subscription(false); if (sub) await sub.unsubscribe(); } catch { /* τίποτα */ }
 }
 

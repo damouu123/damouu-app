@@ -185,12 +185,15 @@ function pushSection() {
       <button class="btn btn-block" data-push-on>Turn on reminders</button>`;
   }
   const { lastSync, error } = pushStatus();
+  const lead = getLead();
   return `
     <ul class="list"><li><div class="row row-static"><span class="row-text">
-      <span class="row-title">On</span>
-      <span class="row-sub wrap">${getLead()} min before each class, then every ${NAG_EVERY_MIN} min until you mark it.</span></span>
+      <span class="row-title">${lead ? 'On' : 'Choose a time'}</span>
+      <span class="row-sub wrap">${lead
+        ? `${lead} min before each class, then every ${NAG_EVERY_MIN} min until you mark it.`
+        : 'No alerts until you pick a time below and tap Save.'}</span></span>
       ${error ? `<span class="row-value small-value is-low">${error}</span>`
-        : `<span class="row-value small-value earned">${lastSync ? 'Synced' : 'Waiting'}</span>`}
+        : lead ? `<span class="row-value small-value earned">${lastSync ? 'Synced' : 'Waiting'}</span>` : ''}
     </div></li></ul>
     <p class="field-label">Alert me before class (minutes)</p>
     <div class="segmented lead-seg" role="radiogroup" aria-label="Minutes before class">
@@ -271,7 +274,7 @@ function render(el) {
     if ('pushOn' in b.dataset) {
       b.disabled = true;
       const result = await enablePush();
-      toast({ ok: 'Reminders are on. A test alert is on its way', denied: 'Notifications are blocked. Allow them in iPhone Settings', unsupported: 'Add the app to your Home Screen first' }[result] || result);
+      toast({ ok: 'Now pick when to get alerts and tap Save', denied: 'Notifications are blocked. Allow them in iPhone Settings', unsupported: 'Add the app to your Home Screen first' }[result] || result);
       render(el);
       return;
     }
@@ -314,7 +317,7 @@ register({
   settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
 
   homeCard() {
-    if (pushEnabled()) return { value: '', label: `Push alerts ${getLead()} min before class` };
+    if (pushEnabled()) return { value: '', label: getLead() ? `Push alerts ${getLead()} min before class` : 'Pick an alert time' };
     const exported = store.get('exported', null);
     return { value: '', label: exported ? `Alerts ${exported.lead} min before class` : 'Not set up yet' };
   },

@@ -2,17 +2,18 @@
 //
 // ΤΙ ΚΑΝΕΙ: κάθε λεπτό κοιτάει τα μαθήματα που του έστειλε το app και στέλνει
 // ειδοποίηση στο iPhone:
-//   - 10/20/40/60' πριν από κάθε μάθημα (lead, το διαλέγεις στο app)
+//   - 10/20/40/60' πριν από κάθε μάθημα (lead, το διαλέγεις στο app και πατάς Save)
+//   Χωρίς αποθηκευμένο lead (π.χ. μόλις άνοιξες τις ειδοποιήσεις) δεν στέλνουμε ΤΙΠΟΤΑ.
 //   - μετά το τέλος, κάθε 10', μέχρι να δηλώσεις Went / Missed / Cancelled
 //     (όχι 23:00-08:00, και όχι για μαθήματα παλιότερα από 2 μέρες)
 //
 // ΠΩΣ ΜΙΛΑΕΙ ΜΕ ΤΟ APP
 //   GET  /vapid  -> { publicKey }   το δημόσιο κλειδί για την εγγραφή στις ειδοποιήσεις
 //   POST /sync   { key, subscription?, classes, lead, tzOffset } -> { ok, subscribed, lead }
+//                lead: 10/20/40/60, ή null = καμία ειδοποίηση μέχρι να πατήσεις Save
 //                key: μυστικό που φτιάχνει το app. Η ΠΡΩΤΗ εγγραφή το "κλειδώνει":
 //                από εκεί και πέρα δεχόμαστε μόνο το ίδιο key.
 //                classes: [{ key, title, room, startsAt, endsAt, status }] (ms)
-//   POST /test   { key }  -> ειδοποίηση "Reminders are on" (όταν τις ανοίγεις)
 //
 // ΑΠΟΘΗΚΕΥΣΗ (KV, binding "DB"):
 //   vapid  { publicKey, privateJwk }  φτιάχνεται μόνο του την πρώτη φορά
@@ -22,7 +23,6 @@
 // (RFC 8291, aes128gcm) και υπογεγραμμένες (VAPID, RFC 8292). Όλα με WebCrypto.
 
 const LEADS = [10, 20, 40, 60];
-const DEFAULT_LEAD = 20;
 const NAG_EVERY_MIN = 10;
 const NAG_WINDOW_H = 48;
 const QUIET_FROM = 23; // ώρα (τοπική)
@@ -48,32 +48,21 @@ export default {
       if (request.method === 'GET' && pathname === '/vapid') {
         return json({ publicKey: (await getVapid(env)).publicKey });
       }
-      if (request.method === 'POST' && (pathname === '/sync' || pathname === '/test')) {
+      if (request.method === 'POST' && pathname === '/sync') {
         const body = await request.json();
         const state = await getState(env);
         if (typeof body.key !== 'string' || body.key.length < 20) return json({ error: 'bad key' }, 400);
         if (state.appKey && state.appKey !== body.key) return json({ error: 'wrong key' }, 403);
         state.appKey = body.key;
 
-        if (pathname === '/test') {
-          if (!state.sub) return json({ error: 'not subscribed' }, 409);
-          const lead = state.lead || DEFAULT_LEAD;
-          const status = await sendPush(env, state.sub, {
-            title: 'Reminders are on',
-            body: `You'll get an alert ${lead} minutes before each class, then every ${NAG_EVERY_MIN} minutes until you mark it.`,
-            tag: 'test',
-            url: APP_URL,
-          });
-          return json({ ok: status < 300, status });
-        }
-
         if (body.subscription && body.subscription.endpoint) state.sub = body.subscription;
         if (Array.isArray(body.classes)) state.classes = body.classes.slice(0, 200).map(cleanClass);
         if (Number.isFinite(body.tzOffset)) state.tzOffset = body.tzOffset;
-        if (LEADS.includes(body.lead)) state.lead = body.lead;
+        if (body.lead === null) state.lead = null;
+        else if (LEADS.includes(body.lead)) state.lead = body.lead;
         await env.DB.put('state', JSON.stringify(state));
         // Ο χρόνος που ΑΠΟΘΗΚΕΥΣΕ ο server: το app τον συγκρίνει με αυτόν που διάλεξες
-        return json({ ok: true, subscribed: !!state.sub, lead: state.lead || DEFAULT_LEAD });
+        return json({ ok: true, subscribed: !!state.sub, lead: state.lead || null });
       }
       return json({ error: 'not found' }, 404);
     } catch (err) {
@@ -103,7 +92,7 @@ async function getState(env) {
 
 async function tick(env) {
   const state = await getState(env);
-  if (!state.sub || !state.classes) return;
+  if (!state.sub || !state.classes || !state.lead) return; // δεν έχεις πατήσει Save
   const now = Date.now();
   const hm = (ts) => new Date(ts - (state.tzOffset || 0) * 60000).toISOString().slice(11, 16); // "15:00" τοπική
   const localHour = Number(hm(now).slice(0, 2));
@@ -118,7 +107,7 @@ async function tick(env) {
   };
 
   // 1) lead' πριν από το μάθημα
-  const lead = state.lead || DEFAULT_LEAD;
+  const { lead } = state;
   for (const c of state.classes) {
     if (c.status || state.sent[c.key]) continue;
     if (now >= c.startsAt - lead * 60000 && now < c.endsAt) {
