@@ -4,7 +4,7 @@
 // ειδοποίηση στο iPhone:
 //   - 10/20/40/60' πριν από κάθε μάθημα (lead, το διαλέγεις στο app και πατάς Save)
 //   Χωρίς αποθηκευμένο lead (π.χ. μόλις άνοιξες τις ειδοποιήσεις) δεν στέλνουμε ΤΙΠΟΤΑ.
-//   - μετά το τέλος, κάθε 10', μέχρι να δηλώσεις Went / Missed / Cancelled
+//   - από την ΩΡΑ ΕΝΑΡΞΗΣ, κάθε 10', μόνο αν δεν το έχεις δηλώσει (Went / Missed / Cancelled)
 //     (όχι 23:00-08:00, και όχι για μαθήματα παλιότερα από 2 μέρες)
 //
 // ΠΩΣ ΜΙΛΑΕΙ ΜΕ ΤΟ APP
@@ -125,16 +125,18 @@ async function tick(env) {
     }
   }
 
-  // 2) Μετά το τέλος: υπενθύμιση κάθε 10' μέχρι να δηλώσεις
+  // 2) Από την ώρα έναρξης: υπενθύμιση κάθε 10' μέχρι να δηλώσεις
   const due = unmarked(state.classes, now);
   if (state.sub && due.length && !quiet && now - (state.lastNag || 0) >= NAG_EVERY_MIN * 60000) {
     state.lastNag = now;
     changed = true;
     const first = due[0];
     await send({
-      title: due.length === 1 ? `Did you go to ${first.title}?` : `${due.length} classes to mark`,
+      title: due.length === 1
+        ? (now < first.endsAt ? `Are you at ${first.title}?` : `Did you go to ${first.title}?`)
+        : `${due.length} classes to mark`,
       body: due.length === 1
-        ? `It ended at ${hm(first.endsAt)}. Tap to mark Went, Missed or Cancelled.`
+        ? `${now < first.endsAt ? 'It started' : 'It ended'} at ${hm(now < first.endsAt ? first.startsAt : first.endsAt)}. Tap to mark Went, Missed or Cancelled.`
         : `${due.map((c) => c.title).join(', ')}. Tap to mark them.`,
       tag: 'unmarked',
       url: `${APP_URL}#/calendar/class/${encodeURIComponent(first.key)}`,
@@ -149,10 +151,10 @@ async function tick(env) {
   if (changed) await env.DB.put('state', JSON.stringify(state));
 }
 
-// Μαθήματα που τελείωσαν (τις τελευταίες 48 ώρες) και δεν έχεις δηλώσει
+// Μαθήματα που ΞΕΚΙΝΗΣΑΝ (έως 48 ώρες μετά το τέλος τους) και δεν έχεις δηλώσει
 function unmarked(classes, now) {
   return classes
-    .filter((c) => !c.status && c.endsAt <= now && now - c.endsAt < NAG_WINDOW_H * 3600000)
+    .filter((c) => !c.status && c.startsAt <= now && now - c.endsAt < NAG_WINDOW_H * 3600000)
     .sort((a, b) => a.startsAt - b.startsAt);
 }
 

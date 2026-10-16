@@ -4,7 +4,7 @@
 // για αργότερα. Ο server κρατάει τα επόμενα μαθήματά σου και, την κατάλληλη ώρα,
 // στέλνει ειδοποίηση μέσω της Apple:
 //   - 10/20/40/60' πριν από κάθε μάθημα (το διαλέγεις)
-//   - μετά το τέλος, κάθε 10', μέχρι να δηλώσεις Went / Missed / Cancelled
+//   - από την ώρα έναρξης, κάθε 10', μόνο αν δεν το έχεις δηλώσει
 // Πατώντας την ειδοποίηση ανοίγει το app στο συγκεκριμένο μάθημα.
 //
 // ΤΙ ΣΤΕΛΝΟΥΜΕ ΣΤΟΝ SERVER: τα μαθήματα από 2 μέρες πίσω έως 14 μπροστά
@@ -176,9 +176,9 @@ function syncSoon() {
   }, 1500);
 }
 
-// Κόκκινος αριθμός στο εικονίδιο: μαθήματα που τελείωσαν και δεν τα δήλωσες
+// Κόκκινος αριθμός στο εικονίδιο: μαθήματα που ξεκίνησαν και δεν τα δήλωσες
 export function unmarkedCount(now = Date.now()) {
-  return classesForServer().filter((c) => !c.status && c.endsAt <= now && now - c.endsAt < NAG_WINDOW_MS).length;
+  return classesForServer().filter((c) => !c.status && c.startsAt <= now && now - c.endsAt < NAG_WINDOW_MS).length;
 }
 function updateBadge() {
   try {
