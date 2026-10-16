@@ -275,21 +275,53 @@ function renderSettings(el) {
   });
 }
 
+// Η κάτω μπάρα φτιάχνεται ΜΙΑ φορά και μετά μόνο αλλάζει ποια καρτέλα είναι
+// ενεργή. Έτσι το "χάπι" πίσω από την ενεργή καρτέλα γλιστράει ομαλά από τη μία
+// στην άλλη, αντί να εμφανίζεται απότομα.
+let builtTabs = '';
+
 function renderTabbar(activeId) {
   const tabs = [{ id: 'home', title: 'Today', icon: HOME_ICON }, ...allModules().filter((m) => m.nav)];
   const bar = document.getElementById('tabbar');
-  bar.innerHTML = tabs.map((t) => {
-    // Ένα module μπορεί να δείχνει αριθμό πάνω στην καρτέλα (π.χ. packs που περιμένουν)
+  const ids = tabs.map((t) => t.id).join(',');
+  if (ids !== builtTabs) {
+    builtTabs = ids;
+    bar.style.setProperty('--tabs', tabs.length);
+    bar.innerHTML = `<span class="tab-pill" aria-hidden="true"></span>${tabs.map((t) => `
+      <a href="#/${t.id}" class="tab" data-tab="${t.id}">
+        <span class="tab-icon">${icon(t.icon)}<span class="tab-badge" hidden></span></span>
+        <span class="tab-label">${escapeHtml(t.title)}</span>
+      </a>`).join('')}`;
+    // Μόλις ακουμπήσεις: μικρή δόνηση. (Στο pointerdown, όχι στο click: η δόνηση
+    // "πατάει" έναν κρυφό διακόπτη, και αν γίνει μαζί με την αλλαγή σελίδας,
+    // ο τροχός του Focus χάνει τη θέση του.)
+    bar.addEventListener('pointerdown', (ev) => { if (ev.target.closest('.tab')) haptic(); });
+    // Πάτημα: "αναπήδηση" του εικονιδίου (και όταν είσαι ήδη εκεί)
+    bar.addEventListener('click', (ev) => {
+      const tab = ev.target.closest('.tab');
+      if (!tab) return;
+      tab.classList.remove('pop');
+      void tab.offsetWidth; // ξαναπαίζει την κίνηση
+      tab.classList.add('pop');
+    });
+  }
+
+  const index = tabs.findIndex((t) => t.id === activeId);
+  bar.classList.toggle('has-active', index >= 0);
+  if (index >= 0) bar.style.setProperty('--tab-index', index);
+  tabs.forEach((t) => {
+    const a = bar.querySelector(`[data-tab="${t.id}"]`);
+    const on = t.id === activeId;
+    a.classList.toggle('active', on);
+    if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+    // Ένα module μπορεί να δείχνει αριθμό πάνω στην καρτέλα
     let badge = 0;
     try { badge = t.badge ? t.badge() : 0; } catch (err) { console.error(t.id, err); }
-    return `
-    <a href="#/${t.id}" class="tab ${t.id === activeId ? 'active' : ''}"
-       ${t.id === activeId ? 'aria-current="page"' : ''}
-       ${badge ? `aria-label="${escapeHtml(t.title)}, ${badge} new"` : ''}>
-      <span class="tab-icon">${icon(t.icon)}${badge ? `<span class="tab-badge">${badge > 9 ? '9+' : badge}</span>` : ''}</span>
-      <span>${escapeHtml(t.title)}</span>
-    </a>`;
-  }).join('');
+    const b = a.querySelector('.tab-badge');
+    b.hidden = !badge;
+    b.textContent = badge > 9 ? '9+' : String(badge || '');
+    if (badge) a.setAttribute('aria-label', `${t.title}, ${badge} new`); else a.removeAttribute('aria-label');
+  });
 }
 
 // ===================== Κινήσεις αλλαγής οθόνης =====================
