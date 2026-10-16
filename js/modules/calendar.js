@@ -6,7 +6,7 @@
 //               ένα κλειδί ανά μάθημα ανά ημερομηνία. Μετράνε μόνο όσα
 //               ταιριάζουν με το τωρινό πρόγραμμα (δες validAttendance).
 //
-// Τα export functions παρακάτω τα χρησιμοποιούν και άλλα modules (XP, εβδομάδα,
+// Τα export functions παρακάτω τα χρησιμοποιούν και άλλα modules (μυαλό, εβδομάδα,
 // ειδοποιήσεις), ώστε να μη χρειάζεται να ξέρουν πώς αποθηκεύονται τα δεδομένα.
 
 import { register, emit } from '../core/registry.js';
@@ -18,7 +18,7 @@ const store = moduleStore('calendar');
 const MIN_GAP = 30; // λεπτά: μικρότερα κενά δεν τα δείχνουμε
 const MARK_EARLY_MIN = 60; // μπορείς να δηλώσεις παρουσία έως 60' πριν (όσο νωρίς μπορεί να έρθει η ειδοποίηση)
 
-// Οι 4 καταστάσεις. Το "cancelled" δεν μετράει ούτε σε XP ούτε σε στατιστικά.
+// Οι 4 καταστάσεις. Το "cancelled" δεν μετράει ούτε στο μυαλό ούτε σε στατιστικά.
 export const STATUSES = {
   attended: { label: 'Went' },
   left: { label: 'Left early' },
@@ -106,7 +106,7 @@ export function getAttendance() {
 
 // Μόνο οι παρουσίες που ταιριάζουν με το ΤΩΡΙΝΟ πρόγραμμα: το μάθημα
 // υπάρχει ακόμα και γίνεται εκείνη τη μέρα της εβδομάδας. Αυτές μετράνε
-// σε XP και στατιστικά. Οι υπόλοιπες (π.χ. από μάθημα που σβήστηκε ή
+// στο μυαλό και στα στατιστικά. Οι υπόλοιπες (π.χ. από μάθημα που σβήστηκε ή
 // μπήκε λάθος μέρα) δεν σβήνονται, απλώς αγνοούνται. Αν το μάθημα
 // ξαναμπεί στο πρόγραμμα, ξαναμετράνε.
 // Επιστρέφει λίστα: [{ key, id, status, title, type, date, start }]
@@ -599,7 +599,7 @@ function renderForm(el, id) {
     if ('delete' in b.dataset) {
       ask({
         title: `Delete ${e.title}?`,
-        text: 'Its past attendance will stop counting toward XP.',
+        text: 'Its past attendance will stop counting toward your brain.',
         confirmLabel: 'Delete',
       }).then((yes) => {
         if (!yes) return;

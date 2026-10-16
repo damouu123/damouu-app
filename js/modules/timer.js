@@ -1,4 +1,4 @@
-// Timer εστίασης: διάβασμα εξετάσεων, βιβλίο, άσκηση.
+// Timer εστίασης: διάβασμα για εξετάσεις και εργασίες.
 //
 // ΠΩΣ ΜΕΤΡΑΜΕ ΤΟΝ ΧΡΟΝΟ
 // Το iOS "παγώνει" το app όταν δεν το βλέπεις, άρα ένας μετρητής που
@@ -8,11 +8,8 @@
 // endsAt, η συνεδρία ολοκληρώνεται εκείνη τη στιγμή.
 //
 // ΚΑΝΟΝΕΣ
-// - Ολοκληρώνεις: κερδίζεις λεπτά scroll.
-// - Σταματάς νωρίς (παρατεταμένο πάτημα 10" + επιβεβαίωση): χάνεις τη
-//   συνεδρία ΚΑΙ 5 λεπτά από το πορτοφόλι.
-// - Emergency (2 την ημέρα): σταματάς χωρίς την ποινή των 5 λεπτών.
-//   Το app δεν μπορεί να ελέγξει αν ήταν όντως επείγον: είναι στον λόγο σου.
+// - Σταματάς νωρίς: μόνο με παρατεταμένο πάτημα 10" + επιβεβαίωση. Χωρίς ποινή,
+//   η συνεδρία απλώς γράφεται "Stopped".
 // - Τέλος χρόνου: χτυπά ξυπνητήρι μέχρι να κάνεις "slide to stop".
 //   Ένα web app ΔΕΝ μπορεί να ανάψει την οθόνη ή να παίξει ήχο με κλειδωμένο
 //   κινητό. Γι' αυτό: (α) "Keep screen on": η οθόνη δεν σβήνει όσο τρέχει focus,
@@ -25,9 +22,9 @@
 // Δεδομένα (moduleStore('timer')):
 //   active    η συνεδρία που τρέχει τώρα (ή null)
 //   sessions  ιστορικό: [{ id, activity, minutes, startedAt, endedAt, awayMs,
-//                          completed, earned (XP), penalty (XP), reason }]
-//             reason: null (ολοκληρώθηκε) | 'stopped' | 'emergency'
-//   passes    { date: "2026-10-13", used: 1 } emergency passes της ημέρας
+//                          completed, reason }]
+//             reason: null (ολοκληρώθηκε) | 'stopped'
+//             (παλιές συνεδρίες έχουν και earned/penalty/'emergency' από τα XP: αγνοούνται)
 //   last      τελευταία επιλογή δραστηριότητας/διάρκειας
 
 import { register, emit, on } from '../core/registry.js';
@@ -35,7 +32,6 @@ import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, navigate, toast, refresh, openSheet, ask } from '../core/router.js';
 import { chime, alarm, haptic, soundArmed, tick as wheelTick } from '../core/feedback.js';
 import { getSetting, setSetting } from '../core/settings.js';
-import { FOCUS_XP_PER_MIN, STOP_PENALTY_XP } from '../core/rules.js';
 
 const store = moduleStore('timer');
 
@@ -50,10 +46,6 @@ export const ACTIVITIES = {
 const CHOOSABLE = Object.keys(ACTIVITIES).filter((id) => !ACTIVITIES[id].retired);
 const activity = (id) => ACTIVITIES[id] || { label: 'Focus', icon: ACTIVITIES.study.icon };
 
-// Ανταμοιβή: XP ανά λεπτό ολοκληρωμένου focus (κανόνες στο core/rules.js)
-export const earnedFor = (minutes) => minutes * FOCUS_XP_PER_MIN;
-export const PENALTY_XP = STOP_PENALTY_XP; // XP που χάνεις αν σταματήσεις νωρίς χωρίς emergency pass
-const PASSES_PER_DAY = 2;
 const HOLD_MS = 10000; // πόση ώρα κρατάς πατημένο για να σταματήσεις
 const MIN_MIN = 1;     // από 1 λεπτό...
 const MAX_MIN = 300;   // ...έως 5 ώρες
@@ -72,16 +64,6 @@ const getActive = () => store.get('active', null);
 export const getActiveSession = () => getActive();
 const saveActive = (a) => store.set('active', a);
 
-const todayKey = () => new Date().toLocaleDateString('sv'); // "2026-10-13"
-
-function passesLeft() {
-  const p = store.get('passes', null);
-  return PASSES_PER_DAY - (p && p.date === todayKey() ? p.used : 0);
-}
-
-function usePass() {
-  store.set('passes', { date: todayKey(), used: PASSES_PER_DAY - passesLeft() + 1 });
-}
 
 // ===================== Κύκλος ζωής συνεδρίας =====================
 
@@ -156,8 +138,7 @@ function closeAway(a) {
   }
 }
 
-// reason: null = τελείωσε ο χρόνος, 'stopped' = σταμάτησες (ποινή),
-//         'emergency' = σταμάτησες με emergency pass (χωρίς ποινή)
+// reason: null = τελείωσε ο χρόνος, 'stopped' = σταμάτησες νωρίς
 function finish(reason) {
   const a = getActive();
   if (!a) return null;
@@ -171,8 +152,6 @@ function finish(reason) {
     endedAt: completed ? a.endsAt : Date.now(),
     awayMs: Math.round(a.awayMs),
     completed,
-    earned: completed ? earnedFor(a.minutes) : 0,
-    penalty: reason === 'stopped' ? PENALTY_XP : 0, // σε XP
     reason,
   };
   store.update('sessions', (list) => [...list, session], []);
@@ -332,40 +311,28 @@ function renderConfirm() {
   if (!a || !overlay) return;
   overlay.dataset.view = 'confirm';
   const left = Math.ceil((a.endsAt - Date.now()) / 60000);
-  const passes = passesLeft();
   overlay.innerHTML = `
     <div class="focus-inner confirm">
       <h2>Do you really want to stop?</h2>
       <p class="muted">You have ${left} ${left === 1 ? 'minute' : 'minutes'} left.
-        If you stop now, you lose this session and ${PENALTY_XP} XP.</p>
+        If you stop now, this session won't count as finished.</p>
       <div class="stack">
         <button class="btn btn-block" data-keep>Keep focusing</button>
-        ${passes > 0 ? `
-          <button class="btn btn-quiet btn-block" data-emergency>It's an emergency</button>
-          <p class="muted small-print">Stops without losing ${PENALTY_XP} XP.
-            ${passes === 1 ? 'This is your last emergency pass today.' : `You have ${passes} emergency passes left today.`}</p>` : `
-          <p class="muted small-print">You've used both emergency passes today.</p>`}
-        <button class="btn btn-danger btn-block" data-quit>Stop and lose ${PENALTY_XP} XP</button>
+        <button class="btn btn-danger btn-block" data-quit>Stop session</button>
       </div>
     </div>`;
 
   // Μετά από διακοπή: κλείνουμε την οθόνη και ξαναζωγραφίζουμε ό,τι είναι
   // από κάτω (π.χ. τη λίστα "Today" και το υπόλοιπο στην Αρχική)
-  const stop = (reason, message) => {
-    finish(reason);
+  const stop = () => {
+    finish('stopped');
     hideOverlay();
-    toast(message);
+    toast('Session stopped');
     if (getSetting('lockAlarm')) toast('Also cancel the timer in Clock');
     refresh();
   };
   overlay.querySelector('[data-keep]').addEventListener('click', renderRunning);
-  overlay.querySelector('[data-emergency]')?.addEventListener('click', () => {
-    usePass();
-    stop('emergency', 'Emergency stop. No penalty');
-  });
-  overlay.querySelector('[data-quit]').addEventListener('click', () => {
-    stop('stopped', `Session stopped. −${PENALTY_XP} XP`);
-  });
+  overlay.querySelector('[data-quit]').addEventListener('click', stop);
 }
 
 // ===================== Ξυπνητήρι: "slide to stop" =====================
@@ -452,14 +419,13 @@ function renderResult(session) {
   overlay.innerHTML = `
     <div class="focus-inner">
       <p class="hero-label">Session complete</p>
-      <p class="hero-number"><strong>+${session.earned}</strong><span>XP</span></p>
-      <p>${session.minutes} minutes of ${activity(session.activity).label.toLowerCase()}.
-        Nice work.</p>
+      <p class="hero-number"><strong>${session.minutes}</strong><span>min</span></p>
+      <p>${activity(session.activity).label}. Nice work.</p>
       <div class="stack"><button class="btn btn-block" data-done>Done</button></div>
     </div>`;
   overlay.querySelector('[data-done]').addEventListener('click', () => {
     hideOverlay();
-    // Στην Αρχική, για να δεις το νέο υπόλοιπο λεπτών
+    // Πίσω στην Αρχική
     if (['', 'home'].includes(location.hash.replace(/^#\/?/, ''))) refresh();
     else navigate('home');
   });
@@ -498,24 +464,17 @@ function todaySessions() {
 
 // Τι δείχνουμε δεξιά σε κάθε συνεδρία της λίστας "Today"
 function sessionValue(s) {
-  if (s.completed) return { text: `+${s.earned}`, cls: 'earned', sub: '' };
-  if (s.reason === 'emergency') return { text: '0', cls: 'muted', sub: ', emergency stop' };
-  // Παλιές συνεδρίες (πριν την ποινή) δεν έχουν penalty
-  return s.penalty
-    ? { text: `−${s.penalty}`, cls: 'is-low', sub: ', stopped early' }
-    : { text: 'Stopped', cls: 'muted', sub: '' };
+  return s.completed ? { text: 'Done', cls: 'good', sub: '' } : { text: 'Stopped', cls: 'muted', sub: '' };
 }
 
-// Διαγραφή συνεδρίας (π.χ. καταγράφηκε λάθος). Τα XP της (ή η ποινή της)
-// φεύγουν μαζί της, αφού τα XP υπολογίζονται από τις συνεδρίες.
+// Διαγραφή συνεδρίας (π.χ. καταγράφηκε λάθος)
 async function deleteSession(id, after) {
   const s = getSessions().find((x) => x.id === id);
   if (!s) return;
   const v = sessionValue(s);
-  const effect = s.completed ? `You lose its ${s.earned} XP.` : s.penalty ? `Its −${s.penalty} XP penalty is removed too.` : '';
   const yes = await ask({
     title: 'Delete this session?',
-    text: `${activity(s.activity).label}, ${clock(s.startedAt)}, ${s.minutes} min (${v.text}). ${effect}`,
+    text: `${activity(s.activity).label}, ${clock(s.startedAt)}, ${s.minutes} min (${v.text.toLowerCase()}).`,
     confirmLabel: 'Delete',
   });
   if (!yes) return;
@@ -628,8 +587,7 @@ function render(el) {
     wheel.setAttribute('aria-valuetext', `${m} minutes`);
     presets.forEach((b) => b.classList.toggle('selected', Number(b.dataset.minutes) === m));
     caption.textContent = m >= 60 ? hoursText(m) : '';
-    const earn = earnedFor(m);
-    note.textContent = `Finish to earn ${earn} XP. Stopping early costs ${PENALTY_XP} XP.`;
+    note.textContent = 'To stop early, hold the stop button for 10 seconds.';
   }
 
   function cancelAnim() {

@@ -35,7 +35,7 @@ export function icon(paths) {
   return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true">${paths}</svg>`;
 }
 
-// Σύντομο μήνυμα κάτω από την οθόνη που σβήνει μόνο του (π.χ. "+10 XP").
+// Σύντομο μήνυμα κάτω από την οθόνη που σβήνει μόνο του (π.χ. "Session deleted").
 // Αν έρθουν πολλά μαζί, μπαίνουν σε ουρά και εμφανίζονται ένα-ένα.
 const toastQueue = [];
 let toastBusy = false;
@@ -295,7 +295,7 @@ function renderTabbar(activeId) {
 // ===================== Κινήσεις αλλαγής οθόνης =====================
 // Σε ποια κατεύθυνση "γλιστράει" η νέα οθόνη:
 //   ανάμεσα σε καρτέλες της κάτω μπάρας: δεξιά/αριστερά ανάλογα με τη θέση τους
-//   πιο "βαθιά" (π.χ. Today -> XP, Settings -> Backup): έρχεται από δεξιά
+//   πιο "βαθιά" (π.χ. Today -> Your brain, Settings -> Backup): έρχεται από δεξιά
 //   πίσω (π.χ. Backup -> Settings): έρχεται από αριστερά
 
 let previous = null; // { key, depth, tab }
@@ -335,7 +335,7 @@ function placeOf(id, mod, params) {
   if (tab >= 0) depth = params.length; // καρτέλα (+ υπο-οθόνες της, π.χ. calendar/edit)
   else if (id === 'settings') depth = 1;
   else if (mod && mod.settings) depth = 2 + params.length;
-  else depth = 1 + params.length;      // π.χ. XP, Weekly review από την Αρχική
+  else depth = 1 + params.length;      // π.χ. Your brain, Weekly review από την Αρχική
   return { tab, depth };
 }
 

@@ -255,9 +255,7 @@ function focusDetails(e) {
   const when = e.live ? `${fromMin(e.start)}, still running` : `${fromMin(e.start)}–${fromMin(e.end)}`;
   let result = 'In progress';
   if (!e.live) {
-    if (s.completed) result = `Completed, +${s.earned} XP`;
-    else if (s.reason === 'emergency') result = 'Stopped early, emergency pass';
-    else result = `Stopped early${s.penalty ? `, −${s.penalty} XP` : ''}`;
+    result = s.completed ? 'Completed' : 'Stopped early';
   }
   openSheet(`
     <h2>${escapeHtml(e.title)}</h2>

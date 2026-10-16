@@ -1647,3 +1647,42 @@ body { background: transparent; }
 .kdot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ec); box-shadow: inset 0 0 0 1.5px rgba(20, 42, 110, 0.25); }
 .kind-homework { --ec: #FBBF24; }
 .lead-seg + .btn { margin-top: 14px; }
+
+/* ===== Το μυαλό (js/modules/brain.js) ===== */
+.brain-card { display: flex; flex-direction: column; gap: 0; }
+.brain-top { display: flex; align-items: center; justify-content: space-between; }
+.brain-stage { padding: 3px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); font-size: 13px; font-weight: 650; }
+.brain-figure { display: block; width: min(64%, 240px); margin: 4px auto 0; }
+.brain { display: block; width: 100%; height: auto; overflow: visible; }
+.brain-body { transform-origin: 100px 92px; transition: transform 0.6s var(--spring); }
+.brain-float { animation: brain-float 4s ease-in-out infinite; }
+.mood-happy .brain-float { animation: brain-bounce 1.6s var(--ease) infinite; }
+.mood-tired .brain-float { animation: brain-sway 4.5s ease-in-out infinite; transform-origin: 100px 150px; }
+@keyframes brain-float { 50% { transform: translateY(-4px); } }
+@keyframes brain-bounce { 0%, 100% { transform: translateY(0); } 30% { transform: translateY(-9px); } 55% { transform: translateY(0) scale(1.03, 0.97); } }
+@keyframes brain-sway { 0%, 100% { transform: rotate(-3deg) translateY(3px); } 50% { transform: rotate(3deg) translateY(3px); } }
+
+.lobes-edge circle { fill: #D9739C; }
+.lobes circle { fill: #F8A9C6; }
+.folds path { fill: none; stroke: #DE7FA6; stroke-width: 4; stroke-linecap: round; }
+/* Σκουριά: το χρώμα "μαυρίζει" και εμφανίζονται κηλίδες */
+.rust-1 .lobes circle { fill: #EEA9B5; }
+.rust-2 .lobes circle { fill: #DFA191; }
+.rust-2 .lobes-edge circle { fill: #B9775E; }
+.rust-3 .lobes circle { fill: #CB8F6E; }
+.rust-3 .lobes-edge circle { fill: #9C5E3E; }
+.rust-3 .folds path { stroke: #A8694A; }
+.rust circle { fill: #A0532A; opacity: 0.55; }
+
+.face path { fill: none; stroke: #5B2340; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.face .ink-fill { fill: #5B2340; stroke: none; }
+.face .lid { stroke-width: 3; opacity: 0.6; }
+.blush { fill: #FF6F9C; opacity: 0.45; }
+.zz { fill: #FFFFFF; font: 700 20px var(--display); animation: zz 2.4s ease-in-out infinite; }
+.zz.small { font-size: 14px; animation-delay: 0.6s; }
+@keyframes zz { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+.drop { fill: #A9DBFF; }
+.sparkles path { fill: #FFE38A; animation: zz 1.8s ease-in-out infinite; }
+
+.brain-mood { display: block; margin: 2px 0 12px; text-align: center; font-weight: 650; }
+.stats-1 { grid-template-columns: 1fr; }

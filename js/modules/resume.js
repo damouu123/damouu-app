@@ -1,15 +1,15 @@
-// Εβδομαδιαίο resume: παρουσίες, απουσίες, ποσοστό, XP, streak
+// Εβδομαδιαίο resume: παρουσίες, απουσίες, ποσοστό, streak
 // και σύγκριση με την προηγούμενη εβδομάδα.
 //
 // Δεν αποθηκεύει τίποτα: όλα υπολογίζονται από τις παρουσίες του calendar
-// και τα XP του xp module, κάθε φορά που ανοίγεις την οθόνη.
+// (και το streak από το brain.js), κάθε φορά που ανοίγεις την οθόνη.
 
 import { register } from '../core/registry.js';
 import { navigate, escapeHtml } from '../core/router.js';
 import {
   validAttendance, entriesForDate, weekStart, addDays, dateKey, weekHeading,
 } from './calendar.js';
-import { xpBetween, streakUntil } from './xp.js';
+import { streakUntil } from './brain.js';
 
 // ===================== Υπολογισμός =====================
 
@@ -53,7 +53,6 @@ export function weekStats(ws) {
     counted,
     // Ποσοστό παρουσίας: Went + Left early (εμφανίστηκες) προς όσα μετράνε
     rate: counted ? (attended + left) / counted : null,
-    xp: xpBetween(from, to),
     streak: streakUntil(to),
     unmarked,
     courses: [...courses.values()].sort((a, b) => a.shown / a.total - b.shown / b.total),
@@ -127,9 +126,8 @@ function render(el) {
       <div class="stat"><strong>${s.left}</strong><span><i class="sdot left"></i>Left early</span></div>
       <div class="stat"><strong class="${s.missed ? 'is-low' : ''}">${s.missed}</strong><span><i class="sdot missed"></i>Missed</span></div>
     </div>
-    <div class="stats stats-2">
-      <div class="stat"><strong class="xp-plus">+${s.xp}</strong><span>XP</span></div>
-      <div class="stat"><strong>${s.streak}</strong><span>Streak</span></div>
+    <div class="stats stats-1">
+      <div class="stat"><strong>${s.streak}</strong><span>Streak, classes in a row without a miss</span></div>
     </div>
 
     ${courses}`;
@@ -156,7 +154,7 @@ register({
   homeCard() {
     const s = weekStats(weekStart(new Date()));
     if (s.rate === null) return { value: '', label: 'No classes marked this week' };
-    return { value: `${pct(s.rate)}%`, label: `Attendance this week, +${s.xp} XP` };
+    return { value: `${pct(s.rate)}%`, label: 'Attendance this week' };
   },
   render,
   // Την επόμενη φορά ξεκινάμε πάλι από την τρέχουσα εβδομάδα
