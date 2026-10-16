@@ -25,7 +25,7 @@ import { moduleStore } from '../core/storage.js';
 import { entriesForDate, addDays, startOfDay } from './calendar.js';
 
 // Η διεύθυνση του server (φαίνεται μετά το "npx wrangler deploy")
-export const PUSH_SERVER = '';
+export const PUSH_SERVER = 'https://discipline-push.stylianosppdm.workers.dev';
 
 const store = moduleStore('push');
 const DAYS_BACK = 2;

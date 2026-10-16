@@ -11,4 +11,4 @@ crons = ["* * * * *"]
 #   npx wrangler kv namespace create DB
 [[kv_namespaces]]
 binding = "DB"
-id = "REPLACE_WITH_KV_ID"
+id = "ce7dc37c33ae4cf7bed9d93e48b22cbc"
