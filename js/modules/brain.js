@@ -4,10 +4,11 @@
 //   Went         κάθε 5 μαθήματα που πήγες, μεγαλώνει ένα "stage"
 //   Left early   κουράζεται
 //   Missed       αρχίζει να σκουριάζει
-//   Όλα κρίνονται από ΟΛΑ τα μαθήματα που έχεις δηλώσει (όχι από τη μέρα ή
-//   τα πρόσφατα): η σκουριά από το ποσοστό των Missed, η κούραση από το
-//   ποσοστό των Left early. Όσο πηγαίνεις, τα ποσοστά πέφτουν και ξεθωριάζουν.
-//   Αν σχεδόν όλα είναι Went, είναι χαρούμενο.
+//   Η διάθεση κρίνεται από ΟΛΑ τα μαθήματα που έχεις δηλώσει: ό,τι έχεις κάνει
+//   τις περισσότερες φορές "κερδίζει".
+//     πιο πολλά Went (ή ισοπαλία)  -> χαρούμενο
+//     πιο πολλά Missed              -> σκουριασμένο
+//     πιο πολλά Left early          -> κουρασμένο
 //   Τα cancelled δεν μετράνε.
 //
 // Δεν αποθηκεύει τίποτα για το μυαλό: όλα υπολογίζονται από τις παρουσίες.
@@ -17,6 +18,7 @@
 //
 // Δεδομένα (moduleStore('brain')):
 //   lastStage  το stage την τελευταία φορά που το δείξαμε
+//   lastMood   η διάθεση την τελευταία φορά που τη δείξαμε
 
 import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
@@ -26,10 +28,6 @@ import { validAttendance } from './calendar.js';
 const store = moduleStore('brain');
 
 const GROW_EVERY = 5;   // μαθήματα (Went) για κάθε μεγάλωμα
-// Από ποιο ποσοστό (στο σύνολο των μαθημάτων) ξεκινά κάθε επίπεδο
-const RUST_AT = [0.05, 0.15, 0.3];  // Missed: σκουριά 1, 2, 3
-const TIRED_AT = [0.1, 0.25];       // Left early: κούραση 1, 2
-const levelOf = (rate, steps) => steps.filter((s) => rate >= s).length;
 const MAX_STAGE_SIZE = 10; // μετά από αυτό το stage δεν μεγαλώνει άλλο στην οθόνη
 
 // ===================== Υπολογισμός =====================
@@ -60,27 +58,24 @@ export function streakUntil(toKey) {
 }
 
 export function brainState(records = countedRecords()) {
-  const total = records.length;
   const count = (s) => records.filter((r) => r.status === s).length;
   const went = count('attended');
-  const missRate = total ? count('missed') / total : 0;
-  const leftRate = total ? count('left') / total : 0;
-  const rust = levelOf(missRate, RUST_AT);
-  const tired = levelOf(leftRate, TIRED_AT);
-  const mood = rust >= 2 ? 'rusty'
-    : tired ? 'tired'
-      : rust ? 'worried'
-        : went ? 'happy' : 'calm';
+  const left = count('left');
+  const missed = count('missed');
+  // Ό,τι έγινε τις περισσότερες φορές. Σε ισοπαλία κερδίζει το Went.
+  const mood = !records.length ? 'calm'
+    : went >= left && went >= missed ? 'happy'
+      : missed >= left ? 'rusty' : 'tired';
+  // Πόσο έντονη είναι η σκουριά: πιο πολλή αν τα Missed είναι πάνω από τα μισά
+  const rust = mood !== 'rusty' ? 0 : missed > went + left ? 3 : 2;
   const { current, best } = streaks(records);
   return {
     went,
     stage: Math.floor(went / GROW_EVERY),
     into: went % GROW_EVERY, // πόσα μαθήματα μέσα στο τωρινό stage
-    total,
-    missRate,
-    leftRate,
+    left,
+    missed,
     rust,
-    tired,
     mood,
     streak: current,
     bestStreak: best,
@@ -89,8 +84,7 @@ export function brainState(records = countedRecords()) {
 
 const MOOD_TEXT = {
   happy: 'Happy and growing',
-  calm: 'Doing fine',
-  worried: 'A little rusty',
+  calm: 'Mark your classes to wake it up',
   rusty: 'Getting rusty. Go to your next class',
   tired: 'Tired from leaving early',
 };
@@ -106,14 +100,12 @@ function faceSvg(mood) {
   const eyes = {
     happy: '<path d="M78 92q7-9 14 0M108 92q7-9 14 0"/>',
     calm: '<circle cx="85" cy="92" r="4.5" class="ink-fill"/><circle cx="115" cy="92" r="4.5" class="ink-fill"/>',
-    worried: '<circle cx="85" cy="94" r="4.5" class="ink-fill"/><circle cx="115" cy="94" r="4.5" class="ink-fill"/><path d="M77 83l14 4M123 83l-14 4"/>',
     rusty: '<circle cx="85" cy="95" r="4" class="ink-fill"/><circle cx="115" cy="95" r="4" class="ink-fill"/><path d="M76 86l15-3M124 86l-15-3"/>',
     tired: '<path d="M78 94h14M108 94h14"/><path d="M78 90q7 3 14 0M108 90q7 3 14 0" class="lid"/>',
   }[mood];
   const mouth = {
     happy: '<path d="M88 106q12 13 24 0" />',
     calm: '<path d="M92 108q8 6 16 0"/>',
-    worried: '<path d="M93 111q7-4 14 0"/>',
     rusty: '<path d="M90 113q10-8 20 0"/>',
     tired: '<path d="M91 110q4-3 9 0t9 0"/>',
   }[mood];
@@ -157,6 +149,11 @@ function cardHtml(s, tag = 'button') {
       </span>
       <span class="brain-figure">${brainSvg(s)}</span>
       <span class="brain-mood">${MOOD_TEXT[s.mood]}</span>
+      <span class="brain-counts">
+        <span><i class="sdot went"></i><strong>${s.went}</strong> Went</span>
+        <span><i class="sdot left"></i><strong>${s.left}</strong> Left early</span>
+        <span><i class="sdot missed"></i><strong>${s.missed}</strong> Missed</span>
+      </span>
       <span class="progress"><span style="width:${(s.into / GROW_EVERY) * 100}%"></span></span>
       <span class="level-caption">
         <span>${s.into}/${GROW_EVERY} classes</span>
@@ -181,31 +178,34 @@ function render(el) {
       <span class="row-title">${title}</span><span class="row-sub wrap">${sub}</span></span></div></li>`;
   el.innerHTML = `
     ${cardHtml(s, 'section')}
-    <div class="stats">
-      <div class="stat"><strong>${s.went}</strong><span>Classes went</span></div>
-      <div class="stat"><strong>${s.streak}</strong><span>Streak (best ${s.bestStreak})</span></div>
+    <div class="stats stats-2">
+      <div class="stat"><strong>${s.streak}</strong><span>Streak</span></div>
+      <div class="stat"><strong>${s.bestStreak}</strong><span>Best streak</span></div>
     </div>
     <h2 class="section-title">How it works</h2>
     <ul class="list">
       ${rule('Went', `Every ${GROW_EVERY} classes your brain grows.`)}
-      ${rule('Left early', 'Your brain gets tired.')}
-      ${rule('Missed', 'Your brain starts to rust.')}
-      ${rule('Overall', 'It looks at all your classes together, not just today. The more you go, the more rust and tiredness fade.')}
+      ${rule('Mood', 'It looks at all your classes together. If Went is what you do most, it is happy.')}
+      ${rule('Left early', 'If leaving early is what you do most, it gets tired.')}
+      ${rule('Missed', 'If missing is what you do most, it gets rusty.')}
     </ul>`;
 }
 
 // ===================== Μηνύματα όταν δηλώνεις παρουσία =====================
 
-store.set('lastStage', store.get('lastStage', brainState().stage));
-on('schedule:changed', () => store.set('lastStage', brainState().stage));
+// Μήνυμα μόνο όταν αλλάζει κάτι ορατό: μεγάλωσε ή άλλαξε διάθεση
+const remember = (s) => { store.set('lastStage', s.stage); store.set('lastMood', s.mood); };
+if (store.get('lastMood', null) === null) remember(brainState());
+on('schedule:changed', () => remember(brainState()));
 on('attendance:changed', ({ status }) => {
   const s = brainState();
-  const before = store.get('lastStage', s.stage);
-  store.set('lastStage', s.stage);
-  if (s.stage > before) toast(`Your brain grew! Stage ${s.stage}`);
-  else if (status === 'attended') toast(`${GROW_EVERY - s.into} more ${GROW_EVERY - s.into === 1 ? 'class' : 'classes'} to grow`);
-  else if (status === 'missed') toast('Your brain is getting rusty');
-  else if (status === 'left') toast('Your brain is getting tired');
+  const stageBefore = store.get('lastStage', s.stage);
+  const moodBefore = store.get('lastMood', s.mood);
+  remember(s);
+  if (s.stage > stageBefore) toast(`Your brain grew! Stage ${s.stage}`);
+  else if (s.mood !== moodBefore && s.mood !== 'calm') {
+    toast({ happy: 'Your brain is happy again', rusty: 'Your brain is getting rusty', tired: 'Your brain is getting tired' }[s.mood]);
+  } else if (status === 'attended') toast(`${GROW_EVERY - s.into} more ${GROW_EVERY - s.into === 1 ? 'class' : 'classes'} to grow`);
 });
 
 register({
