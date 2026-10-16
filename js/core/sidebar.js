@@ -1,11 +1,11 @@
 // Πλαϊνό μενού (☰): ανοίγει από αριστερά με τις ενότητες του app
-// (όσα modules έχουν sidebar: true, π.χ. University, Fitness, Style).
+// (University, Fitness, Style: js/core/sections.js). Η καθεμία έχει δική της κάτω μπάρα.
 //
 // Κλείνει με: πάτημα έξω από το μενού, σύρσιμο προς τα αριστερά, Escape,
 // ή επιλογή ενότητας.
 
-import { allModules } from './registry.js';
-import { icon, escapeHtml } from './router.js';
+import { icon, escapeHtml, getSection } from './router.js';
+import { SECTIONS } from './sections.js';
 import { haptic } from './feedback.js';
 
 let backdrop = null;
@@ -18,10 +18,10 @@ function build() {
   backdrop.innerHTML = `
     <nav class="drawer" aria-label="Sections">
       <p class="drawer-title">Discipline</p>
-      <div class="drawer-items">${allModules().filter((m) => m.sidebar).map((m, i) => `
-        <a class="drawer-item" href="#/${m.id}" data-section="${m.id}" style="--i:${i}">
-          <span class="drawer-icon">${icon(m.icon)}</span>
-          <span class="drawer-label">${escapeHtml(m.title)}</span>
+      <div class="drawer-items">${SECTIONS.map((s, i) => `
+        <a class="drawer-item" href="#/${s.home}" data-section="${s.id}" style="--i:${i}">
+          <span class="drawer-icon">${icon(s.icon)}</span>
+          <span class="drawer-label">${escapeHtml(s.title)}</span>
           <span class="drawer-chevron" aria-hidden="true">›</span>
         </a>`).join('')}
       </div>
@@ -63,7 +63,7 @@ const isOpen = () => backdrop && backdrop.classList.contains('open');
 export function openSidebar() {
   if (!backdrop) build();
   // Η τωρινή ενότητα φαίνεται επιλεγμένη
-  const current = location.hash.replace(/^#\/?/, '').split('/')[0];
+  const current = getSection();
   backdrop.querySelectorAll('.drawer-item').forEach((a) => a.classList.toggle('active', a.dataset.section === current));
   backdrop.hidden = false;
   document.body.classList.add('drawer-locked');

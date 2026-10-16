@@ -7,6 +7,7 @@ import { allModules, getModule } from './registry.js';
 import { getSetting, setSetting } from './settings.js';
 import { haptic } from './feedback.js';
 import { checkForUpdates, runningVersion } from './updates.js';
+import { DEFAULT_SECTION, sectionOf } from './sections.js';
 
 const view = () => document.getElementById('view');
 let current = null; // το module που φαίνεται τώρα
@@ -163,10 +164,10 @@ function renderHome(el) {
   const mods = allModules();
 
   // Ένα module μπορεί να "πάρει" την κορυφή της Αρχικής (το πορτοφόλι)
-  const heroMod = mods.find((m) => m.renderHomeHero);
+  const heroMod = mods.find((m) => m.renderHomeHero && sectionOf(m) === DEFAULT_SECTION);
   // Στη λίστα μπαίνουν όσα κοιτάς καθημερινά. Τα σπάνια (settings: true) πάνε στις
   // Ρυθμίσεις, και όσα έχουν home: false έχουν ήδη δικό τους κουμπί/καρτέλα.
-  const listMods = mods.filter((m) => m !== heroMod && !m.settings && m.home !== false);
+  const listMods = mods.filter((m) => m !== heroMod && !m.settings && m.home !== false && sectionOf(m) === DEFAULT_SECTION);
 
   // Μήνυμα της στιγμής από module (π.χ. "Your class was cancelled").
   // Δείχνουμε ΜΟΝΟ το πρώτο, για να μη γεμίζει η κορυφή.
@@ -280,9 +281,21 @@ function renderSettings(el) {
 // στην άλλη, αντί να εμφανίζεται απότομα.
 let builtTabs = '';
 
+// Οι καρτέλες μιας ενότητας: University = Today + όσα έχουν nav: true,
+// οι άλλες = η αρχική τους σελίδα + όσα δικά τους έχουν nav: true
+function tabsFor(sec) {
+  const own = allModules().filter((m) => sectionOf(m) === sec);
+  return sec === DEFAULT_SECTION
+    ? [{ id: 'home', title: 'Today', icon: HOME_ICON }, ...own.filter((m) => m.nav)]
+    : [...own.filter((m) => m.sectionHome), ...own.filter((m) => m.nav && !m.sectionHome)];
+}
+
 function renderTabbar(activeId) {
-  const tabs = [{ id: 'home', title: 'Today', icon: HOME_ICON }, ...allModules().filter((m) => m.nav)];
+  const tabs = tabsFor(section);
   const bar = document.getElementById('tabbar');
+  // Ενότητα με μία μόνο σελίδα (π.χ. Fitness προς το παρόν): χωρίς κάτω μπάρα
+  bar.hidden = tabs.length < 2;
+  document.body.classList.toggle('no-tabbar', bar.hidden);
   const ids = tabs.map((t) => t.id).join(',');
   if (ids !== builtTabs) {
     builtTabs = ids;
@@ -295,15 +308,15 @@ function renderTabbar(activeId) {
     // Μόλις ακουμπήσεις: μικρή δόνηση. (Στο pointerdown, όχι στο click: η δόνηση
     // "πατάει" έναν κρυφό διακόπτη, και αν γίνει μαζί με την αλλαγή σελίδας,
     // ο τροχός του Focus χάνει τη θέση του.)
-    bar.addEventListener('pointerdown', (ev) => { if (ev.target.closest('.tab')) haptic(); });
+    bar.onpointerdown = (ev) => { if (ev.target.closest('.tab')) haptic(); };
     // Πάτημα: "αναπήδηση" του εικονιδίου (και όταν είσαι ήδη εκεί)
-    bar.addEventListener('click', (ev) => {
+    bar.onclick = (ev) => {
       const tab = ev.target.closest('.tab');
       if (!tab) return;
       tab.classList.remove('pop');
       void tab.offsetWidth; // ξαναπαίζει την κίνηση
       tab.classList.add('pop');
-    });
+    };
   }
 
   const index = tabs.findIndex((t) => t.id === activeId);
@@ -360,8 +373,19 @@ function goBack() {
   navigate(backTarget());
 }
 
-function placeOf(id, mod, params) {
-  const tabs = ['home', ...allModules().filter((m) => m.nav).map((m) => m.id)];
+// Η ενότητα που βλέπεις τώρα (University, Fitness, Style)
+let section = DEFAULT_SECTION;
+export const getSection = () => section;
+
+// Σε ποια ενότητα ανήκει μια οθόνη. Οι Ρυθμίσεις είναι κοινές: μένεις όπου ήσουν.
+function sectionFor(id, mod) {
+  if (id === 'home') return DEFAULT_SECTION;
+  if (id === 'settings' || (mod && mod.settings)) return section;
+  return sectionOf(mod);
+}
+
+function placeOf(id, mod, params, sec) {
+  const tabs = tabsFor(sec).map((t) => t.id);
   const tab = tabs.indexOf(id);
   let depth;
   if (tab >= 0) depth = params.length; // καρτέλα (+ υπο-οθόνες της, π.χ. calendar/edit)
@@ -374,6 +398,7 @@ function placeOf(id, mod, params) {
 function directionTo(next) {
   if (!previous) return 'none';
   if (previous.key === next.key) return 'none'; // απλή ανανέωση της ίδιας οθόνης
+  if (previous.section !== next.section) return 'fade'; // άλλη ενότητα από το μενού
   if (next.depth > previous.depth) return 'forward';
   if (next.depth < previous.depth) return 'back';
   if (next.tab >= 0 && previous.tab >= 0) return next.tab > previous.tab ? 'right' : 'left';
@@ -421,7 +446,8 @@ function route() {
   // Αν η διεύθυνση δεν αντιστοιχεί σε οθόνη, πάμε στην Αρχική
   if (!builtin && !mod) { navigate('home'); return; }
 
-  const place = { key: parts.join('/') || 'home', ...placeOf(id, mod, params) };
+  section = sectionFor(id, mod);
+  const place = { key: parts.join('/') || 'home', section, ...placeOf(id, mod, params, section) };
   const direction = directionTo(place);
   previous = place;
   trackTrail(place.key);
@@ -449,8 +475,8 @@ function route() {
       document.title = 'Discipline';
     }
 
-    // Γρανάζι ρυθμίσεων μόνο στην Αρχική, "‹ Settings" μόνο σε οθόνες των Ρυθμίσεων
-    document.getElementById('settings-link').hidden = id !== 'home';
+    // Γρανάζι ρυθμίσεων στην αρχική σελίδα κάθε ενότητας
+    document.getElementById('settings-link').hidden = !(place.depth === 0 && place.tab === 0);
     // Κουμπί πίσω σε κάθε οθόνη που δεν είναι κορυφαία καρτέλα (Today, Schedule, Focus)
     const backBtn = document.getElementById('back-link');
     backBtn.hidden = place.depth < 1;

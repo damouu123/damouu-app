@@ -1840,3 +1840,7 @@ body.drawer-locked { overflow: hidden; }
   background: linear-gradient(180deg, var(--navy) 0%, #1B3C8F 100%);
   pointer-events: none;
 }
+
+/* Ενότητα χωρίς καρτέλες (π.χ. Fitness προς το παρόν): χωρίς κάτω μπάρα */
+.tabbar[hidden] { display: none; }
+body.no-tabbar { padding-bottom: var(--safe-bottom); }
