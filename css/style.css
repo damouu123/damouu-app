@@ -69,7 +69,6 @@ html, body {
 
 body {
   min-height: 100dvh;
-  padding-top: var(--safe-top);
   padding-bottom: calc(var(--tabbar-h) + var(--safe-bottom));
 }
 
@@ -1825,3 +1824,19 @@ body.drawer-locked { overflow: hidden; }
 }
 .section-empty-icon .icon { width: 32px; height: 32px; }
 .section-empty p { margin: 0; }
+
+/* ===== Πάνω μπάρα κάτω από την ώρα/μπαταρία του iPhone =====
+   Η μπάρα μένει πάντα ΚΑΤΩ από την περιοχή της ώρας, ακόμα κι όταν κυλάς.
+   Η περιοχή της ώρας έχει σκούρο μπλε φόντο, για να διαβάζονται τα λευκά
+   γράμματα του iPhone πάνω από το ανοιχτό φόντο του app. */
+.topbar { padding-top: calc(var(--safe-top) + 18px); }
+.topbar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--safe-top);
+  background: linear-gradient(180deg, var(--navy) 0%, #1B3C8F 100%);
+  pointer-events: none;
+}
