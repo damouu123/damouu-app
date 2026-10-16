@@ -1,0 +1,14 @@
+# Ρυθμίσεις για το Cloudflare (εντολή: npx wrangler deploy, μέσα στον φάκελο server)
+name = "discipline-push"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# Κάθε λεπτό: έλεγχος αν πρέπει να σταλεί ειδοποίηση
+[triggers]
+crons = ["* * * * *"]
+
+# Η "βάση" του server (KV). Το id μπαίνει μετά την εντολή:
+#   npx wrangler kv namespace create DB
+[[kv_namespaces]]
+binding = "DB"
+id = "REPLACE_WITH_KV_ID"

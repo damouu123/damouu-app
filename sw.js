@@ -4,7 +4,7 @@
 //
 // ΣΗΜΑΝΤΙΚΟ: Κάθε φορά που αλλάζεις οποιοδήποτε αρχείο, ανέβασε το VERSION.
 // Έτσι το iPhone καταλαβαίνει ότι υπάρχει νέα έκδοση.
-const VERSION = 'v35';
+const VERSION = 'v36';
 const CACHE = `discipline-${VERSION}`;
 
 // Όλα τα αρχεία του app (σχετικά paths, για να δουλεύει σε GitHub Pages υποφάκελο)
@@ -27,6 +27,7 @@ const ASSETS = [
   './js/modules/resume.js',
   './js/modules/timer.js',
   './js/modules/notifications.js',
+  './js/modules/push.js',
   './js/modules/backup.js',
   './data/schedule.js',
   './icons/icon-180.png',
@@ -53,7 +54,41 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
-// 3) Κάθε αίτημα: πρώτα από την cache, αλλιώς από το δίκτυο
+// 3) Push ειδοποίηση από τον server (server/worker.js)
+self.addEventListener('push', (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { /* κενό μήνυμα */ }
+  event.waitUntil((async () => {
+    // Κόκκινος αριθμός στο εικονίδιο: πόσα μαθήματα περιμένουν δήλωση
+    try { if (data.badge && self.navigator.setAppBadge) await self.navigator.setAppBadge(data.badge); } catch { /* τίποτα */ }
+    await self.registration.showNotification(data.title || 'Discipline', {
+      body: data.body || '',
+      tag: data.tag,
+      renotify: true,
+      requireInteraction: true, // όπου υποστηρίζεται, μένει μέχρι να την πατήσεις
+      icon: './icons/icon-192.png',
+      data: { url: data.url || './' },
+    });
+  })());
+});
+
+// Πάτημα στην ειδοποίηση: ανοίγουμε το app στο σωστό μάθημα
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data && event.notification.data.url || './', self.registration.scope).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (windows.length) {
+      const win = windows[0];
+      try { await win.focus(); } catch { /* τίποτα */ }
+      win.postMessage({ type: 'open', url });
+      return;
+    }
+    await self.clients.openWindow(url);
+  })());
+});
+
+// 4) Κάθε αίτημα: πρώτα από την cache, αλλιώς από το δίκτυο
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;

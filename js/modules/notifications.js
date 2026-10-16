@@ -18,6 +18,9 @@ import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { navigate, toast, ask, openSheet } from '../core/router.js';
 import {
+  pushSupported, pushConfigured, pushEnabled, pushStatus, enablePush, disablePush, testPush, LEAD_MIN,
+} from './push.js';
+import {
   getSchedule, entriesForDate, gapsForDate, startOfDay, addDays, weekday, dateKey, parseKey,
   toMin, fromMin, duration,
 } from './calendar.js';
@@ -168,6 +171,30 @@ on('attendance:changed', ({ date, id, status }) => {
 
 // ===================== Οθόνη =====================
 
+function pushSection() {
+  if (!pushConfigured()) {
+    return '<p class="muted small-print">Not connected to a reminder server yet.</p>';
+  }
+  if (!pushSupported()) {
+    return '<p class="muted small-print">Open the app from your Home Screen to turn on notifications (iOS 16.4 or later).</p>';
+  }
+  if (!pushEnabled()) {
+    return `
+      <p class="muted intro">An alert ${LEAD_MIN} minutes before each class. Tap it to mark Went, Missed or Cancelled. If you don't, it comes back every 30 minutes until you do.</p>
+      <button class="btn btn-block" data-push-on>Turn on reminders</button>`;
+  }
+  const { lastSync, error } = pushStatus();
+  return `
+    <ul class="list"><li><div class="row row-static"><span class="row-text">
+      <span class="row-title">On</span>
+      <span class="row-sub wrap">${LEAD_MIN} min before each class, then every 30 min until you mark it.</span></span>
+      ${error ? `<span class="row-value small-value is-low">${error}</span>`
+        : `<span class="row-value small-value earned">${lastSync ? 'Synced' : 'Waiting'}</span>`}
+    </div></li></ul>
+    <button class="btn btn-quiet btn-block" data-push-test>Send a test alert</button>
+    <button class="link-btn centered" data-push-off>Turn off</button>`;
+}
+
 // Φύλλο: οδηγίες και τι είναι αξιόπιστο στο iPhone (ώστε η οθόνη να μένει καθαρή)
 function infoSheet() {
   openSheet(`
@@ -198,7 +225,11 @@ function render(el) {
   const short = (ts) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
   el.innerHTML = `
-    <p class="muted intro first-intro">Get an alert from your iPhone Calendar before each class. It works even when this app is closed.</p>
+    <h2 class="section-title first">Push reminders</h2>
+    ${pushSection()}
+
+    <h2 class="section-title">Calendar alerts</h2>
+    <p class="muted intro">Get an alert from your iPhone Calendar before each class. It works even when this app is closed.</p>
 
     <p class="field-label">Minutes before class</p>
     <div class="segmented lead-seg" role="radiogroup" aria-label="Minutes before class">
@@ -227,6 +258,22 @@ function render(el) {
     const b = ev.target.closest('button');
     if (!b) return;
     if ('info' in b.dataset) { infoSheet(); return; }
+    if ('pushOn' in b.dataset) {
+      b.disabled = true;
+      const result = await enablePush();
+      toast({ ok: 'Reminders are on. A test alert is on its way', denied: 'Notifications are blocked. Allow them in iPhone Settings', unsupported: 'Add the app to your Home Screen first' }[result] || result);
+      render(el);
+      return;
+    }
+    if ('pushTest' in b.dataset) {
+      toast((await testPush()) ? 'Test alert sent' : 'Could not send the test alert');
+      return;
+    }
+    if ('pushOff' in b.dataset) {
+      const yes = await ask({ title: 'Turn off push reminders?', text: 'You will stop getting alerts before and after your classes.', confirmLabel: 'Turn off' });
+      if (yes) { await disablePush(); toast('Push reminders are off'); render(el); }
+      return;
+    }
     if ('download' in b.dataset || 'share' in b.dataset) {
       const settings = getSettings();
       if ('share' in b.dataset) {
@@ -252,6 +299,7 @@ register({
   settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
 
   homeCard() {
+    if (pushEnabled()) return { value: '', label: `Push alerts ${LEAD_MIN} min before class` };
     const exported = store.get('exported', null);
     return { value: '', label: exported ? `Alerts ${exported.lead} min before class` : 'Not set up yet' };
   },

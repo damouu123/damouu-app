@@ -16,6 +16,7 @@ import { SEED_SCHEDULE } from '../../data/schedule.js';
 
 const store = moduleStore('calendar');
 const MIN_GAP = 30; // λεπτά: μικρότερα κενά δεν τα δείχνουμε
+const MARK_EARLY_MIN = 20; // μπορείς να δηλώσεις παρουσία από 20' πριν (όταν έρχεται η ειδοποίηση)
 
 // Οι 4 καταστάσεις. Το "cancelled" δεν μετράει ούτε σε XP ούτε σε στατιστικά.
 export const STATUSES = {
@@ -377,6 +378,18 @@ function renderMonth(el) {
   };
 }
 
+// Από ειδοποίηση: δείχνουμε τη μέρα του μαθήματος και ανοίγουμε τις επιλογές του
+function openFromLink(el, key) {
+  const date = parseKey(key.split('|')[0]);
+  history.replaceState(null, '', '#/calendar'); // ώστε ένα refresh να μην το ξανανοίγει
+  if (Number.isNaN(date.getTime())) { renderMonth(el); return; }
+  selected = startOfDay(date);
+  shownMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+  renderMonth(el);
+  const entry = entriesForDate(date).find((x) => x.key === key);
+  if (entry) openClassSheet(entry, () => renderMonth(el));
+}
+
 // Η προβολή ημέρας (dayview.js) δηλώνει εδώ τον εαυτό της όταν φορτωθεί.
 // Έτσι το calendar.js δεν χρειάζεται να την κάνει import (αποφεύγουμε κύκλο).
 let dayViewOpener = null;
@@ -416,7 +429,7 @@ function openCancelledSheet(date, after) {
 
 // Φύλλο ενεργειών ενός μαθήματος. after: τι να γίνει όταν αλλάξει κάτι
 export function openClassSheet(entry, after) {
-  const started = entry.startsAt <= new Date();
+  const started = entry.startsAt - MARK_EARLY_MIN * 60000 <= Date.now();
   const day = parseKey(entry.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
   const actions = entry.status === 'cancelled'
     // Ακυρωμένο: μόνο επαναφορά
@@ -624,8 +637,10 @@ register({
   },
 
   // #/calendar -> μήνας, #/calendar/edit -> λίστα, #/calendar/edit/<id> -> φόρμα
+  // #/calendar/class/<key> -> ο μήνας με ανοιχτό το μάθημα (από ειδοποίηση)
   render(el, params = []) {
-    if (params[0] === 'edit' && params[1]) renderForm(el, params[1]);
+    if (params[0] === 'class' && params[1]) openFromLink(el, params[1]);
+    else if (params[0] === 'edit' && params[1]) renderForm(el, params[1]);
     else if (params[0] === 'edit') renderEditList(el);
     else renderMonth(el);
   },
