@@ -18,8 +18,8 @@ import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { navigate, toast, ask, openSheet } from '../core/router.js';
 import {
-  pushSupported, pushConfigured, pushEnabled, pushStatus, enablePush, disablePush, testPush, LEAD_MIN,
-  startTestClass, getTestClass,
+  pushSupported, pushConfigured, pushEnabled, pushStatus, enablePush, disablePush, testPush,
+  LEADS as PUSH_LEADS, NAG_EVERY_MIN, getLead, setLead,
 } from './push.js';
 import {
   getSchedule, entriesForDate, gapsForDate, startOfDay, addDays, weekday, dateKey, parseKey,
@@ -172,17 +172,6 @@ on('attendance:changed', ({ date, id, status }) => {
 
 // ===================== Οθόνη =====================
 
-function testLine() {
-  const t = getTestClass();
-  if (!t) return '';
-  const time = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  const text = t.status ? 'Test class marked. Done'
-    : Date.now() < t.startsAt - LEAD_MIN * 60000 ? `Test class at ${time(t.startsAt)}. First alert in about a minute, the "Did you go?" alert after ${time(t.endsAt)}`
-    : Date.now() < t.endsAt ? `Test class at ${time(t.startsAt)}. The "Did you go?" alert comes after ${time(t.endsAt)}`
-    : 'Test class ended. Alerts repeat every 30 min until you mark it';
-  return `<p class="muted small-print">${text}.</p>`;
-}
-
 function pushSection() {
   if (!pushConfigured()) {
     return '<p class="muted small-print">Not connected to a reminder server yet.</p>';
@@ -192,20 +181,23 @@ function pushSection() {
   }
   if (!pushEnabled()) {
     return `
-      <p class="muted intro">An alert ${LEAD_MIN} minutes before each class. Tap it to mark Went, Missed or Cancelled. If you don't, it comes back every 30 minutes until you do.</p>
+      <p class="muted intro">An alert before each class. Tap it to mark Went, Missed or Cancelled. If you don't, it comes back every ${NAG_EVERY_MIN} minutes until you do.</p>
       <button class="btn btn-block" data-push-on>Turn on reminders</button>`;
   }
   const { lastSync, error } = pushStatus();
   return `
     <ul class="list"><li><div class="row row-static"><span class="row-text">
       <span class="row-title">On</span>
-      <span class="row-sub wrap">${LEAD_MIN} min before each class, then every 30 min until you mark it.</span></span>
+      <span class="row-sub wrap">${getLead()} min before each class, then every ${NAG_EVERY_MIN} min until you mark it.</span></span>
       ${error ? `<span class="row-value small-value is-low">${error}</span>`
         : `<span class="row-value small-value earned">${lastSync ? 'Synced' : 'Waiting'}</span>`}
     </div></li></ul>
-    ${testLine()}
-    <button class="btn btn-quiet btn-block" data-push-class>Try with a test class</button>
-    <button class="link-btn centered" data-push-test>Send a test alert</button>
+    <p class="field-label">Alert me before class (minutes)</p>
+    <div class="segmented lead-seg" role="radiogroup" aria-label="Minutes before class">
+      ${PUSH_LEADS.map((m) => `
+        <label><input type="radio" name="pushLead" value="${m}" ${getLead() === m ? 'checked' : ''}><span>${m}</span></label>`).join('')}
+    </div>
+    <button class="btn btn-quiet btn-block" data-push-test>Send a test alert</button>
     <button class="link-btn centered" data-push-off>Turn off</button>`;
 }
 
@@ -264,8 +256,13 @@ function render(el) {
   el.querySelector('#until').addEventListener('change', (ev) => {
     if (ev.target.value) saveSettings({ until: ev.target.value });
   });
-  el.onchange = (ev) => {
+  el.onchange = async (ev) => {
     if (ev.target.name === 'lead') saveSettings({ lead: Number(ev.target.value) });
+    if (ev.target.name === 'pushLead') {
+      const ok = await setLead(Number(ev.target.value));
+      toast(ok ? 'Saved. A confirmation alert is on its way' : 'Could not reach the reminder server');
+      render(el);
+    }
   };
 
   el.onclick = async (ev) => {
@@ -276,12 +273,6 @@ function render(el) {
       b.disabled = true;
       const result = await enablePush();
       toast({ ok: 'Reminders are on. A test alert is on its way', denied: 'Notifications are blocked. Allow them in iPhone Settings', unsupported: 'Add the app to your Home Screen first' }[result] || result);
-      render(el);
-      return;
-    }
-    if ('pushClass' in b.dataset) {
-      b.disabled = true;
-      toast((await startTestClass()) ? 'Test class added. Lock your phone and wait about a minute' : 'Could not reach the reminder server');
       render(el);
       return;
     }
@@ -319,7 +310,7 @@ register({
   settings: true, // μπαίνει στις Ρυθμίσεις, όχι στη λίστα της Αρχικής
 
   homeCard() {
-    if (pushEnabled()) return { value: '', label: `Push alerts ${LEAD_MIN} min before class` };
+    if (pushEnabled()) return { value: '', label: `Push alerts ${getLead()} min before class` };
     const exported = store.get('exported', null);
     return { value: '', label: exported ? `Alerts ${exported.lead} min before class` : 'Not set up yet' };
   },

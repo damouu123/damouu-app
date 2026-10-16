@@ -2,27 +2,28 @@
 //
 // ΤΙ ΚΑΝΕΙ: κάθε λεπτό κοιτάει τα μαθήματα που του έστειλε το app και στέλνει
 // ειδοποίηση στο iPhone:
-//   - 20' πριν από κάθε μάθημα ("Starts at 15:00 in Δ23")
-//   - μετά το τέλος, κάθε 30', μέχρι να δηλώσεις Went / Missed / Cancelled
+//   - 10/20/40/60' πριν από κάθε μάθημα (lead, το διαλέγεις στο app)
+//   - μετά το τέλος, κάθε 10', μέχρι να δηλώσεις Went / Missed / Cancelled
 //     (όχι 23:00-08:00, και όχι για μαθήματα παλιότερα από 2 μέρες)
 //
 // ΠΩΣ ΜΙΛΑΕΙ ΜΕ ΤΟ APP
 //   GET  /vapid  -> { publicKey }   το δημόσιο κλειδί για την εγγραφή στις ειδοποιήσεις
-//   POST /sync   { key, subscription?, classes, tzOffset }
+//   POST /sync   { key, subscription?, classes, lead, tzOffset }
 //                key: μυστικό που φτιάχνει το app. Η ΠΡΩΤΗ εγγραφή το "κλειδώνει":
 //                από εκεί και πέρα δεχόμαστε μόνο το ίδιο key.
 //                classes: [{ key, title, room, startsAt, endsAt, status }] (ms)
-//   POST /test   { key }  -> στέλνει μια δοκιμαστική ειδοποίηση
+//   POST /test   { key, reason? }  -> ειδοποίηση επιβεβαίωσης με τις ρυθμίσεις που ΕΧΕΙ ο server
 //
 // ΑΠΟΘΗΚΕΥΣΗ (KV, binding "DB"):
 //   vapid  { publicKey, privateJwk }  φτιάχνεται μόνο του την πρώτη φορά
-//   state  { appKey, sub, classes, tzOffset, sent: { [classKey]: true }, lastNag }
+//   state  { appKey, sub, classes, lead, tzOffset, sent: { [classKey]: true }, lastNag }
 //
 // ΚΡΥΠΤΟΓΡΑΦΗΣΗ: οι push ειδοποιήσεις πρέπει να είναι κρυπτογραφημένες
 // (RFC 8291, aes128gcm) και υπογεγραμμένες (VAPID, RFC 8292). Όλα με WebCrypto.
 
-const LEAD_MIN = 20;
-const NAG_EVERY_MIN = 30;
+const LEADS = [10, 20, 40, 60];
+const DEFAULT_LEAD = 20;
+const NAG_EVERY_MIN = 10;
 const NAG_WINDOW_H = 48;
 const QUIET_FROM = 23; // ώρα (τοπική)
 const QUIET_TO = 8;
@@ -56,9 +57,10 @@ export default {
 
         if (pathname === '/test') {
           if (!state.sub) return json({ error: 'not subscribed' }, 409);
+          const lead = state.lead || DEFAULT_LEAD;
           const status = await sendPush(env, state.sub, {
-            title: 'Reminders are on',
-            body: `You'll get an alert ${LEAD_MIN} minutes before each class.`,
+            title: body.reason === 'lead' ? `Alerts ${lead} minutes before class` : 'Reminders are on',
+            body: `You'll get an alert ${lead} minutes before each class, then every ${NAG_EVERY_MIN} minutes until you mark it.`,
             tag: 'test',
             url: APP_URL,
           });
@@ -68,6 +70,7 @@ export default {
         if (body.subscription && body.subscription.endpoint) state.sub = body.subscription;
         if (Array.isArray(body.classes)) state.classes = body.classes.slice(0, 200).map(cleanClass);
         if (Number.isFinite(body.tzOffset)) state.tzOffset = body.tzOffset;
+        if (LEADS.includes(body.lead)) state.lead = body.lead;
         await env.DB.put('state', JSON.stringify(state));
         return json({ ok: true, subscribed: !!state.sub });
       }
@@ -113,10 +116,11 @@ async function tick(env) {
     return status;
   };
 
-  // 1) 20' πριν από το μάθημα
+  // 1) lead' πριν από το μάθημα
+  const lead = state.lead || DEFAULT_LEAD;
   for (const c of state.classes) {
     if (c.status || state.sent[c.key]) continue;
-    if (now >= c.startsAt - LEAD_MIN * 60000 && now < c.endsAt) {
+    if (now >= c.startsAt - lead * 60000 && now < c.endsAt) {
       state.sent[c.key] = true;
       changed = true;
       const mins = Math.max(1, Math.round((c.startsAt - now) / 60000));
@@ -131,7 +135,7 @@ async function tick(env) {
     }
   }
 
-  // 2) Μετά το τέλος: υπενθύμιση κάθε 30' μέχρι να δηλώσεις
+  // 2) Μετά το τέλος: υπενθύμιση κάθε 10' μέχρι να δηλώσεις
   const due = unmarked(state.classes, now);
   if (state.sub && due.length && !quiet && now - (state.lastNag || 0) >= NAG_EVERY_MIN * 60000) {
     state.lastNag = now;

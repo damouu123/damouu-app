@@ -3,8 +3,8 @@
 // ΓΙΑΤΙ SERVER: ένα web app στο iPhone δεν μπορεί να "προγραμματίσει" ειδοποίηση
 // για αργότερα. Ο server κρατάει τα επόμενα μαθήματά σου και, την κατάλληλη ώρα,
 // στέλνει ειδοποίηση μέσω της Apple:
-//   - 20' πριν από κάθε μάθημα
-//   - μετά το τέλος, κάθε 30', μέχρι να δηλώσεις Went / Missed / Cancelled
+//   - 10/20/40/60' πριν από κάθε μάθημα (το διαλέγεις)
+//   - μετά το τέλος, κάθε 10', μέχρι να δηλώσεις Went / Missed / Cancelled
 // Πατώντας την ειδοποίηση ανοίγει το app στο συγκεκριμένο μάθημα.
 //
 // ΤΙ ΣΤΕΛΝΟΥΜΕ ΣΤΟΝ SERVER: τα μαθήματα από 2 μέρες πίσω έως 14 μπροστά
@@ -19,12 +19,11 @@
 //   enabled   αν είναι ανοιχτές οι ειδοποιήσεις
 //   lastSync  πότε ενημερώθηκε τελευταία φορά ο server (ms)
 //   error     τελευταίο σφάλμα (ή null)
-//   test      ψεύτικο μάθημα για δοκιμή { key, title, room, startsAt, endsAt, status }
+//   lead      πόσα λεπτά πριν από το μάθημα έρχεται η ειδοποίηση (10/20/40/60)
 
-import { on, emit } from '../core/registry.js';
+import { on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { entriesForDate, addDays, startOfDay, STATUSES } from './calendar.js';
-import { openSheet, escapeHtml, toast } from '../core/router.js';
+import { entriesForDate, addDays, startOfDay } from './calendar.js';
 
 // Η διεύθυνση του server (φαίνεται μετά το "npx wrangler deploy")
 export const PUSH_SERVER = 'https://discipline-push.stylianosppdm.workers.dev';
@@ -33,7 +32,11 @@ const store = moduleStore('push');
 const DAYS_BACK = 2;
 const DAYS_AHEAD = 14;
 const NAG_WINDOW_MS = 48 * 3600000; // ίδιο με τον server
-export const LEAD_MIN = 20;
+export const LEADS = [10, 20, 40, 60];
+export const NAG_EVERY_MIN = 10; // ίδιο με τον server
+export const getLead = () => store.get('lead', 20);
+
+store.remove('test'); // το δοκιμαστικό μάθημα της v38 δεν υπάρχει πια
 
 export const pushSupported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 export const pushConfigured = () => !!PUSH_SERVER;
@@ -70,57 +73,8 @@ function classesForServer() {
       });
     }
   }
-  const test = activeTest();
-  if (test) list.push(test);
   return list;
 }
-
-// ===================== Δοκιμαστικό μάθημα =====================
-// Ψεύτικο μάθημα που ξεκινά σε 21' και κρατά 3': η ειδοποίηση "πριν" έρχεται σε
-// ~1 λεπτό, και η υπενθύμιση "Did you go?" όταν τελειώσει (~24'). Δεν μπαίνει
-// στο πρόγραμμα ούτε στα XP· σβήνεται μόνο του 2 ώρες μετά.
-const TEST_PREFIX = 'test|';
-function activeTest() {
-  const t = store.get('test', null);
-  return t && Date.now() < t.endsAt + 2 * 3600000 ? t : null;
-}
-export const getTestClass = activeTest;
-
-export async function startTestClass() {
-  const now = Date.now();
-  const startsAt = Math.ceil((now + (LEAD_MIN + 1) * 60000) / 60000) * 60000; // στρογγυλό λεπτό
-  store.set('test', {
-    key: `${TEST_PREFIX}${now.toString(36)}`, title: 'Test lecture', room: 'Test room',
-    startsAt, endsAt: startsAt + 3 * 60000, status: null,
-  });
-  return syncNow();
-}
-
-function openTestSheet() {
-  const t = activeTest();
-  if (!t) { toast('The test class has ended'); return; }
-  const time = (ms) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  openSheet(`
-    <h2>${escapeHtml(t.title)}</h2>
-    <p class="muted">Today, ${time(t.startsAt)}–${time(t.endsAt)}. Only a test: it doesn't count toward XP.</p>
-    <div class="choices">${Object.entries(STATUSES).map(([s, { label }]) => `
-      <button class="choice is-${s} ${t.status === s ? 'selected' : ''}" data-set="${s}">${label}</button>`).join('')}
-    </div>`,
-  (root, close) => {
-    root.addEventListener('click', (ev) => {
-      const b = ev.target.closest('[data-set]');
-      if (!b) return;
-      store.set('test', { ...t, status: b.dataset.set });
-      close();
-      syncNow();
-      toast('Test class marked. No more alerts for it');
-      emit('push:changed');
-    });
-  });
-}
-
-// Το ημερολόγιο δεν ξέρει το ψεύτικο μάθημα: όταν ανοίγει από ειδοποίηση, το χειριζόμαστε εδώ
-on('calendar:link', (key) => { if (key.startsWith(TEST_PREFIX)) openTestSheet(); });
 
 async function post(path, body) {
   const res = await fetch(`${PUSH_SERVER}${path}`, {
@@ -165,7 +119,7 @@ export async function enablePush() {
   if (permission !== 'granted') return 'denied';
   try {
     const sub = await subscription(true);
-    await post('/sync', { key: appKey(), subscription: sub.toJSON(), classes: classesForServer(), tzOffset: new Date().getTimezoneOffset() });
+    await post('/sync', { key: appKey(), subscription: sub.toJSON(), ...syncBody() });
     store.set('enabled', true);
     store.set('lastSync', Date.now());
     store.set('error', null);
@@ -174,6 +128,22 @@ export async function enablePush() {
   } catch (err) {
     store.set('error', errorText(err));
     return errorText(err);
+  }
+}
+
+// Αλλαγή του "πόσα λεπτά πριν". Ο server στέλνει αμέσως ειδοποίηση επιβεβαίωσης
+// με τον χρόνο που ΑΠΟΘΗΚΕΥΣΕ (έτσι ξέρεις ότι η αλλαγή έφτασε). true αν πέτυχε.
+export async function setLead(minutes) {
+  store.set('lead', minutes);
+  try {
+    await post('/sync', { key: appKey(), ...syncBody() });
+    await post('/test', { key: appKey(), reason: 'lead' });
+    store.set('lastSync', Date.now());
+    store.set('error', null);
+    return true;
+  } catch (err) {
+    store.set('error', errorText(err));
+    return false;
   }
 }
 
@@ -193,34 +163,25 @@ export async function disablePush() {
   try { const sub = await subscription(false); if (sub) await sub.unsubscribe(); } catch { /* τίποτα */ }
 }
 
-// Ενημέρωση του server τώρα. Επιστρέφει true αν πέτυχε.
-async function syncNow() {
-  updateBadge();
-  if (!pushEnabled() || !pushConfigured()) return false;
-  try {
-    const sub = await subscription(false);
-    await post('/sync', {
-      key: appKey(),
-      subscription: sub ? sub.toJSON() : undefined,
-      classes: classesForServer(),
-      tzOffset: new Date().getTimezoneOffset(),
-    });
-    store.set('lastSync', Date.now());
-    store.set('error', null);
-    return true;
-  } catch (err) {
-    store.set('error', errorText(err));
-    return false;
-  }
-}
+// Ό,τι χρειάζεται ο server σε κάθε ενημέρωση
+const syncBody = () => ({ classes: classesForServer(), lead: getLead(), tzOffset: new Date().getTimezoneOffset() });
 
-// Με μικρή καθυστέρηση, για να μαζεύονται οι αλλαγές
+// Ενημέρωση του server (με μικρή καθυστέρηση, για να μαζεύονται οι αλλαγές)
 let syncTimer = null;
 function syncSoon() {
   updateBadge();
   if (!pushEnabled() || !pushConfigured()) return;
   clearTimeout(syncTimer);
-  syncTimer = setTimeout(syncNow, 1500);
+  syncTimer = setTimeout(async () => {
+    try {
+      const sub = await subscription(false);
+      await post('/sync', { key: appKey(), subscription: sub ? sub.toJSON() : undefined, ...syncBody() });
+      store.set('lastSync', Date.now());
+      store.set('error', null);
+    } catch (err) {
+      store.set('error', errorText(err));
+    }
+  }, 1500);
 }
 
 // Κόκκινος αριθμός στο εικονίδιο: μαθήματα που τελείωσαν και δεν τα δήλωσες

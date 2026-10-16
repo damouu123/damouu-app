@@ -16,7 +16,7 @@ import { SEED_SCHEDULE } from '../../data/schedule.js';
 
 const store = moduleStore('calendar');
 const MIN_GAP = 30; // λεπτά: μικρότερα κενά δεν τα δείχνουμε
-const MARK_EARLY_MIN = 20; // μπορείς να δηλώσεις παρουσία από 20' πριν (όταν έρχεται η ειδοποίηση)
+const MARK_EARLY_MIN = 60; // μπορείς να δηλώσεις παρουσία έως 60' πριν (όσο νωρίς μπορεί να έρθει η ειδοποίηση)
 
 // Οι 4 καταστάσεις. Το "cancelled" δεν μετράει ούτε σε XP ούτε σε στατιστικά.
 export const STATUSES = {
@@ -382,13 +382,12 @@ function renderMonth(el) {
 function openFromLink(el, key) {
   const date = parseKey(key.split('|')[0]);
   history.replaceState(null, '', '#/calendar'); // ώστε ένα refresh να μην το ξανανοίγει
-  if (Number.isNaN(date.getTime())) { renderMonth(el); emit('calendar:link', key); return; }
+  if (Number.isNaN(date.getTime())) { renderMonth(el); return; }
   selected = startOfDay(date);
   shownMonth = new Date(date.getFullYear(), date.getMonth(), 1);
   renderMonth(el);
   const entry = entriesForDate(date).find((x) => x.key === key);
   if (entry) openClassSheet(entry, () => renderMonth(el));
-  else emit('calendar:link', key); // π.χ. το δοκιμαστικό μάθημα των ειδοποιήσεων (push.js)
 }
 
 // Η προβολή ημέρας (dayview.js) δηλώνει εδώ τον εαυτό της όταν φορτωθεί.
