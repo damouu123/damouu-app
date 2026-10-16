@@ -33,7 +33,7 @@
 import { register, emit, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, navigate, toast, refresh, openSheet } from '../core/router.js';
-import { chime, alarm, haptic, tick as wheelTick } from '../core/feedback.js';
+import { chime, alarm, haptic, soundArmed, tick as wheelTick } from '../core/feedback.js';
 import { getSetting, setSetting } from '../core/settings.js';
 import { FOCUS_XP_PER_MIN, STOP_PENALTY_XP } from '../core/rules.js';
 
@@ -112,7 +112,7 @@ function openAlarmSetup() {
       <li>Open the <strong>Shortcuts</strong> app and tap <strong>+</strong>.</li>
       <li>Add the action <strong>Start Timer</strong>.</li>
       <li>Tap the number in it and choose <strong>Shortcut Input</strong>. Keep the unit as <strong>minutes</strong>.</li>
-      <li>Rename the shortcut to exactly <strong>${SHORTCUT_NAME}</strong> and tap Done.</li>
+      <li>Tap the name at the top, choose <strong>Rename</strong> and type exactly <strong>${SHORTCUT_NAME}</strong> (capital D and T, one space). Tap Done.</li>
     </ol>
     <p class="muted">When a focus session starts, Shortcuts opens for a moment. Tap <strong>◀ Discipline</strong> at the top left to come back.</p>
     <div class="stack">
@@ -248,6 +248,7 @@ function renderRunning() {
         <p class="focus-time" aria-live="off">${fmt(a.endsAt - Date.now())}</p>
       </div>
       <p class="muted focus-ends">Ends at ${clock(a.endsAt)}</p>
+      <button class="arm-sound" type="button" hidden>Tap to turn on the alarm sound</button>
     </div>
     <button class="hold-btn" type="button">
       <span class="hold-fill" aria-hidden="true"></span>
@@ -274,6 +275,8 @@ function tick() {
     return;
   }
   if (overlay.dataset.view !== 'running') return;
+  // Ο ήχος του ξυπνητηριού θέλει ένα άγγιγμα αφού γυρίσεις στο app
+  overlay.querySelector('.arm-sound').hidden = soundArmed();
   overlay.querySelector('.focus-time').textContent = fmt(a.endsAt - now);
   // Ο δακτύλιος αδειάζει όσο περνάει ο χρόνος
   const elapsed = Math.min(1, (now - a.startedAt) / (a.minutes * 60000));

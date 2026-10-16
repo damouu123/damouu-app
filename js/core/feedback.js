@@ -29,6 +29,10 @@ document.addEventListener('keydown', unlockAudio, { capture: true });
 
 const ready = () => audio && audio.state === 'running' && getSetting('sound');
 
+// Μπορεί να παίξει ήχος ΤΩΡΑ; Στο iPhone, όταν βγαίνεις από το app (π.χ. στο
+// Shortcuts), ο ήχος "κλειδώνει" ξανά και χρειάζεται ένα άγγιγμα στην οθόνη.
+export const soundArmed = () => !!audio && audio.state === 'running';
+
 // "Τικ" σαν του τροχού επιλογής του iPhone: πολύ σύντομος θόρυβος (~10ms)
 // φιλτραρισμένος γύρω στα 3.5 kHz, που σβήνει απότομα.
 let tickBuffer = null;

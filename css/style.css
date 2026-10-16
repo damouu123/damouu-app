@@ -709,6 +709,19 @@ body.locked { overflow: hidden; }
 .hold-label { position: relative; }
 
 /* ===== Ξυπνητήρι στο τέλος του focus ===== */
+.arm-sound {
+  margin-top: 18px;
+  padding: 12px 18px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: rgba(167, 139, 250, 0.12);
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  animation: alarm-pulse 1.4s var(--ease) infinite;
+}
+.arm-sound[hidden] { display: none; }
 .alarm-title {
   margin: 28px 0 0;
   font-family: var(--display);
