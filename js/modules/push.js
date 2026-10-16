@@ -131,26 +131,15 @@ export async function enablePush() {
   }
 }
 
-// Αλλαγή του "πόσα λεπτά πριν". Ο server στέλνει αμέσως ειδοποίηση επιβεβαίωσης
-// με τον χρόνο που ΑΠΟΘΗΚΕΥΣΕ (έτσι ξέρεις ότι η αλλαγή έφτασε). true αν πέτυχε.
+// Αποθήκευση του "πόσα λεπτά πριν". Ο server απαντά με τον χρόνο που ΑΠΟΘΗΚΕΥΣΕ:
+// true μόνο αν είναι ίδιος με αυτόν που διάλεξες (άρα η αλλαγή έφτασε σωστά).
 export async function setLead(minutes) {
   store.set('lead', minutes);
   try {
-    await post('/sync', { key: appKey(), ...syncBody() });
-    await post('/test', { key: appKey(), reason: 'lead' });
+    const res = await post('/sync', { key: appKey(), ...syncBody() });
     store.set('lastSync', Date.now());
     store.set('error', null);
-    return true;
-  } catch (err) {
-    store.set('error', errorText(err));
-    return false;
-  }
-}
-
-export async function testPush() {
-  try {
-    await post('/test', { key: appKey() });
-    return true;
+    return res.lead === minutes;
   } catch (err) {
     store.set('error', errorText(err));
     return false;

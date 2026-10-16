@@ -8,11 +8,11 @@
 //
 // ΠΩΣ ΜΙΛΑΕΙ ΜΕ ΤΟ APP
 //   GET  /vapid  -> { publicKey }   το δημόσιο κλειδί για την εγγραφή στις ειδοποιήσεις
-//   POST /sync   { key, subscription?, classes, lead, tzOffset }
+//   POST /sync   { key, subscription?, classes, lead, tzOffset } -> { ok, subscribed, lead }
 //                key: μυστικό που φτιάχνει το app. Η ΠΡΩΤΗ εγγραφή το "κλειδώνει":
 //                από εκεί και πέρα δεχόμαστε μόνο το ίδιο key.
 //                classes: [{ key, title, room, startsAt, endsAt, status }] (ms)
-//   POST /test   { key, reason? }  -> ειδοποίηση επιβεβαίωσης με τις ρυθμίσεις που ΕΧΕΙ ο server
+//   POST /test   { key }  -> ειδοποίηση "Reminders are on" (όταν τις ανοίγεις)
 //
 // ΑΠΟΘΗΚΕΥΣΗ (KV, binding "DB"):
 //   vapid  { publicKey, privateJwk }  φτιάχνεται μόνο του την πρώτη φορά
@@ -59,7 +59,7 @@ export default {
           if (!state.sub) return json({ error: 'not subscribed' }, 409);
           const lead = state.lead || DEFAULT_LEAD;
           const status = await sendPush(env, state.sub, {
-            title: body.reason === 'lead' ? `Alerts ${lead} minutes before class` : 'Reminders are on',
+            title: 'Reminders are on',
             body: `You'll get an alert ${lead} minutes before each class, then every ${NAG_EVERY_MIN} minutes until you mark it.`,
             tag: 'test',
             url: APP_URL,
@@ -72,7 +72,8 @@ export default {
         if (Number.isFinite(body.tzOffset)) state.tzOffset = body.tzOffset;
         if (LEADS.includes(body.lead)) state.lead = body.lead;
         await env.DB.put('state', JSON.stringify(state));
-        return json({ ok: true, subscribed: !!state.sub });
+        // Ο χρόνος που ΑΠΟΘΗΚΕΥΣΕ ο server: το app τον συγκρίνει με αυτόν που διάλεξες
+        return json({ ok: true, subscribed: !!state.sub, lead: state.lead || DEFAULT_LEAD });
       }
       return json({ error: 'not found' }, 404);
     } catch (err) {

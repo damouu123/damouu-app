@@ -18,7 +18,7 @@ import { register, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { navigate, toast, ask, openSheet } from '../core/router.js';
 import {
-  pushSupported, pushConfigured, pushEnabled, pushStatus, enablePush, disablePush, testPush,
+  pushSupported, pushConfigured, pushEnabled, pushStatus, enablePush, disablePush,
   LEADS as PUSH_LEADS, NAG_EVERY_MIN, getLead, setLead,
 } from './push.js';
 import {
@@ -197,7 +197,7 @@ function pushSection() {
       ${PUSH_LEADS.map((m) => `
         <label><input type="radio" name="pushLead" value="${m}" ${getLead() === m ? 'checked' : ''}><span>${m}</span></label>`).join('')}
     </div>
-    <button class="btn btn-quiet btn-block" data-push-test>Send a test alert</button>
+    <button class="btn btn-block" data-push-save disabled>Save</button>
     <button class="link-btn centered" data-push-off>Turn off</button>`;
 }
 
@@ -258,10 +258,9 @@ function render(el) {
   });
   el.onchange = async (ev) => {
     if (ev.target.name === 'lead') saveSettings({ lead: Number(ev.target.value) });
+    // Η επιλογή αποθηκεύεται μόνο με το Save
     if (ev.target.name === 'pushLead') {
-      const ok = await setLead(Number(ev.target.value));
-      toast(ok ? 'Saved. A confirmation alert is on its way' : 'Could not reach the reminder server');
-      render(el);
+      el.querySelector('[data-push-save]').disabled = Number(ev.target.value) === getLead();
     }
   };
 
@@ -276,8 +275,13 @@ function render(el) {
       render(el);
       return;
     }
-    if ('pushTest' in b.dataset) {
-      toast((await testPush()) ? 'Test alert sent' : 'Could not send the test alert');
+    if ('pushSave' in b.dataset) {
+      const minutes = Number(el.querySelector('input[name="pushLead"]:checked').value);
+      b.disabled = true;
+      b.textContent = 'Saving...';
+      const ok = await setLead(minutes);
+      toast(ok ? `Saved. Alerts ${minutes} min before each class` : 'Not saved. Check your connection and try again');
+      render(el);
       return;
     }
     if ('pushOff' in b.dataset) {
