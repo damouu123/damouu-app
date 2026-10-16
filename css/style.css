@@ -1724,3 +1724,104 @@ body { background: transparent; }
 .tab.pop .tab-icon svg { animation: tab-bounce 0.6s var(--spring); }
 @keyframes tab-bounce { 0% { transform: scale(0.8); } 45% { transform: translateY(-4px) scale(1.15); } 100% { transform: translateY(-1px) scale(1.08); } }
 .tab-badge[hidden] { display: none; }
+
+/* ===== Πλαϊνό μενού (☰) ===== */
+.menu-btn {
+  flex: none;
+  align-self: flex-end;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  margin: 0 2px 2px -6px;
+  padding: 0 11px;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  cursor: pointer;
+  transition: transform 0.35s var(--spring), background-color 0.2s;
+}
+.menu-btn[hidden] { display: none; }
+.menu-btn span { display: block; height: 2.5px; border-radius: 2px; background: var(--text); transition: transform 0.35s var(--spring); }
+.menu-btn span:nth-child(2) { width: 70%; }
+.menu-btn:active { transform: scale(0.88); background: var(--surface); }
+.menu-btn:active span:nth-child(2) { transform: translateX(3px); }
+
+body.drawer-locked { overflow: hidden; }
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 180; /* πάνω από την κάτω μπάρα, κάτω από τα φύλλα (200) */
+  background: rgba(15, 32, 80, 0);
+  transition: background-color 0.35s ease, -webkit-backdrop-filter 0.35s, backdrop-filter 0.35s;
+}
+.drawer-backdrop[hidden] { display: none; }
+.drawer-backdrop.open {
+  background: rgba(15, 32, 80, 0.32);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+}
+.drawer {
+  /* σκούρα "ζώνη", όπως τα navy πάνελ */
+  --text: #FFFFFF;
+  --muted: #AEBBDD;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(80vw, 320px);
+  padding: calc(var(--safe-top) + 28px) 14px calc(var(--safe-bottom) + 20px);
+  background: radial-gradient(120% 60% at 0% 0%, #1F3C93 0%, var(--navy) 60%);
+  color: var(--text);
+  border-radius: 0 30px 30px 0;
+  box-shadow: 20px 0 50px rgba(20, 42, 110, 0.35);
+  transform: translateX(-105%);
+  transition: transform 0.5s var(--ease);
+  touch-action: pan-y;
+}
+.drawer-backdrop.open .drawer { transform: translateX(0); }
+.drawer-title { margin: 0 8px 22px; font-family: var(--display); font-size: 26px; font-weight: 700; }
+.drawer-items { display: grid; gap: 6px; }
+.drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 60px;
+  padding: 8px 12px;
+  border-radius: 18px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 18px;
+  font-weight: 650;
+  /* μπαίνουν η μία μετά την άλλη όταν ανοίγει το μενού */
+  opacity: 0;
+  transform: translateX(-18px);
+  transition: opacity 0.3s ease, transform 0.5s var(--spring), background-color 0.2s;
+}
+.drawer-backdrop.open .drawer-item {
+  opacity: 1;
+  transform: none;
+  transition-delay: calc(var(--i, 0) * 50ms + 120ms), calc(var(--i, 0) * 50ms + 120ms), 0s;
+}
+.drawer-item:active { background: rgba(255, 255, 255, 0.12); transform: scale(0.97); transition-delay: 0s; }
+.drawer-item.active { background: rgba(255, 255, 255, 0.1); }
+.drawer-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 15px; background: var(--blue); color: #fff; }
+.drawer-label { flex: 1; }
+.drawer-chevron { color: var(--muted); font-size: 22px; }
+
+/* Άδεια ενότητα (University, Fitness, Style) */
+.section-empty { display: grid; justify-items: center; gap: 10px; margin-top: 18vh; text-align: center; }
+.section-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--shadow);
+  color: var(--blue);
+}
+.section-empty-icon .icon { width: 32px; height: 32px; }
+.section-empty p { margin: 0; }

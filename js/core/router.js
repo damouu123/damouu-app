@@ -454,6 +454,8 @@ function route() {
     // Κουμπί πίσω σε κάθε οθόνη που δεν είναι κορυφαία καρτέλα (Today, Schedule, Focus)
     const backBtn = document.getElementById('back-link');
     backBtn.hidden = place.depth < 1;
+    // Πλαϊνό μενού (☰) στις κεντρικές οθόνες, εκεί που δεν υπάρχει "‹ Back"
+    document.getElementById('menu-btn').hidden = !backBtn.hidden;
     if (!backBtn.hidden) backBtn.textContent = `‹ ${titles.get(backTarget()) || 'Back'}`;
 
     if (mod) {

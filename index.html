@@ -22,6 +22,10 @@
 </head>
 <body>
   <header class="topbar">
+    <!-- Πλαϊνό μενού (☰): φαίνεται στις κεντρικές οθόνες (js/core/sidebar.js) -->
+    <button id="menu-btn" class="menu-btn" type="button" aria-label="Open menu" hidden>
+      <span></span><span></span><span></span>
+    </button>
     <div class="topbar-main">
       <button id="back-link" class="back-link" type="button" hidden>‹ Back</button>
       <h1 id="page-title"></h1>
@@ -49,6 +53,7 @@
     import { startRouter } from './js/core/router.js';
     import { requestPersistentStorage } from './js/core/storage.js';
     import { initUpdates } from './js/core/updates.js';
+    import { initSidebar } from './js/core/sidebar.js';
 
     // Κάθε module καταχωρεί τον εαυτό του στο registry όταν φορτωθεί.
     // Για νέο module (π.χ. workout) αρκεί μία γραμμή import εδώ.
@@ -60,8 +65,10 @@
     import './js/modules/notifications.js';
     import './js/modules/push.js';
     import './js/modules/backup.js';
+    import './js/modules/sections.js';
 
     startRouter();
+    initSidebar();
     requestPersistentStorage();
 
     // --- Ένδειξη offline ---
