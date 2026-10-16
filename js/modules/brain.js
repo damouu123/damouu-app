@@ -174,8 +174,6 @@ function renderHomeHero(el) {
     </div>`;
 }
 
-const pctText = (rate) => `${Math.round(rate * 100)}%`;
-
 function render(el) {
   const s = brainState();
   const rule = (title, sub) => `
@@ -192,7 +190,7 @@ function render(el) {
       ${rule('Went', `Every ${GROW_EVERY} classes your brain grows.`)}
       ${rule('Left early', 'Your brain gets tired.')}
       ${rule('Missed', 'Your brain starts to rust.')}
-      ${rule('Overall', `It looks at all your classes, not just today. Right now: ${pctText(s.missRate)} missed, ${pctText(s.leftRate)} left early. The more you go, the more rust and tiredness fade.`)}
+      ${rule('Overall', 'It looks at all your classes together, not just today. The more you go, the more rust and tiredness fade.')}
     </ul>`;
 }
 
