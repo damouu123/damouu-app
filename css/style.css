@@ -708,6 +708,65 @@ body.locked { overflow: hidden; }
 }
 .hold-label { position: relative; }
 
+/* ===== Ξυπνητήρι στο τέλος του focus ===== */
+.alarm-title {
+  margin: 28px 0 0;
+  font-family: var(--display);
+  font-size: 56px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  animation: alarm-pulse 1.4s var(--ease) infinite;
+}
+@keyframes alarm-pulse { 0%, 100% { transform: scale(1); } 12% { transform: scale(1.05); } }
+.slide-stop {
+  --p: 0;
+  position: relative;
+  height: 72px;
+  border-radius: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.slide-label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding-left: 48px;
+  font-size: 19px;
+  color: transparent;
+  background: linear-gradient(90deg, var(--muted) 0%, var(--muted) 40%, #fff 50%, var(--muted) 60%, var(--muted) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  opacity: calc(1 - var(--p) * 1.6);
+  animation: slide-shimmer 2.2s linear infinite;
+}
+@keyframes slide-shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.slide-thumb {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--bg);
+  cursor: grab;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+.slide-thumb svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.setup-steps { margin: 12px 0; padding-left: 22px; line-height: 1.5; }
+.setup-steps li { margin: 6px 0; }
+@media (prefers-reduced-motion: reduce) {
+  .alarm-title, .slide-label { animation: none; }
+}
+
 .confirm h2 { margin: 0 0 10px; font-family: var(--display); font-size: 28px; font-weight: 600; }
 
 /* ===== Wallet ===== */

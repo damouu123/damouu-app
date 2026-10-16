@@ -13,6 +13,11 @@
 //   συνεδρία ΚΑΙ 5 λεπτά από το πορτοφόλι.
 // - Emergency (2 την ημέρα): σταματάς χωρίς την ποινή των 5 λεπτών.
 //   Το app δεν μπορεί να ελέγξει αν ήταν όντως επείγον: είναι στον λόγο σου.
+// - Τέλος χρόνου: χτυπά ξυπνητήρι μέχρι να κάνεις "slide to stop".
+//   Ένα web app ΔΕΝ μπορεί να ανάψει την οθόνη ή να παίξει ήχο με κλειδωμένο
+//   κινητό. Γι' αυτό: (α) "Keep screen on": η οθόνη δεν σβήνει όσο τρέχει focus,
+//   (β) "Ring on the lock screen": στην αρχή ξεκινάμε ΚΑΙ ένα κανονικό timer του
+//   iPhone μέσω της συντόμευσης "Discipline Timer" (εφαρμογή Shortcuts).
 // - Κλείδωμα κινητού / έξοδος από το app: επιτρέπεται, ο χρόνος συνεχίζει.
 //   (Το iOS δεν λέει στο app αν κλείδωσες ή άνοιξες άλλη εφαρμογή, οπότε
 //   τις άλλες εφαρμογές τις μπλοκάρει το Focus/Screen Time του iPhone.)
@@ -25,10 +30,11 @@
 //   passes    { date: "2026-10-13", used: 1 } emergency passes της ημέρας
 //   last      τελευταία επιλογή δραστηριότητας/διάρκειας
 
-import { register, emit } from '../core/registry.js';
+import { register, emit, on } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
-import { escapeHtml, icon, navigate, toast, refresh } from '../core/router.js';
-import { chime, tick as wheelTick } from '../core/feedback.js';
+import { escapeHtml, icon, navigate, toast, refresh, openSheet } from '../core/router.js';
+import { chime, alarm, haptic, tick as wheelTick } from '../core/feedback.js';
+import { getSetting, setSetting } from '../core/settings.js';
 import { FOCUS_XP_PER_MIN, STOP_PENALTY_XP } from '../core/rules.js';
 
 const store = moduleStore('timer');
@@ -87,6 +93,54 @@ function start(activity, minutes) {
   });
   store.set('last', { activity, minutes });
   showOverlay();
+  if (getSetting('lockAlarm')) startIphoneTimer(minutes);
+}
+
+// ===================== Timer του iPhone (Shortcuts) =====================
+// Η συντόμευση "Discipline Timer" έχει μία ενέργεια: Start Timer για
+// [Shortcut Input] λεπτά. Το app την ανοίγει με τα λεπτά της συνεδρίας.
+const SHORTCUT_NAME = 'Discipline Timer';
+function startIphoneTimer(minutes) {
+  location.href = `shortcuts://run-shortcut?name=${encodeURIComponent(SHORTCUT_NAME)}&input=text&text=${minutes}`;
+}
+
+function openAlarmSetup() {
+  openSheet(`
+    <h2>Set up the lock screen alarm</h2>
+    <p class="muted">An app like this one can't wake a locked iPhone. Your iPhone's own timer can, so the app starts it for you. Set it up once:</p>
+    <ol class="setup-steps">
+      <li>Open the <strong>Shortcuts</strong> app and tap <strong>+</strong>.</li>
+      <li>Add the action <strong>Start Timer</strong>.</li>
+      <li>Tap the number in it and choose <strong>Shortcut Input</strong>. Keep the unit as <strong>minutes</strong>.</li>
+      <li>Rename the shortcut to exactly <strong>${SHORTCUT_NAME}</strong> and tap Done.</li>
+    </ol>
+    <p class="muted">When a focus session starts, Shortcuts opens for a moment. Tap <strong>◀ Discipline</strong> at the top left to come back.</p>
+    <div class="stack">
+      <button class="btn btn-block" data-test>Test it (1 minute timer)</button>
+      <button class="btn btn-quiet btn-block" data-close>Done</button>
+    </div>`, (root, close) => {
+    root.querySelector('[data-test]').addEventListener('click', () => startIphoneTimer(1));
+    root.querySelector('[data-close]').addEventListener('click', close);
+  });
+}
+
+// Όταν ανοίγεις τον διακόπτη στις Ρυθμίσεις, δείχνουμε τις οδηγίες
+on('settings:changed', ({ name, value }) => { if (name === 'lockAlarm' && value) openAlarmSetup(); });
+
+// ===================== Οθόνη ανοιχτή όσο τρέχει focus =====================
+// Wake Lock: το iPhone δεν σβήνει την οθόνη όσο βλέπεις το app (iOS 16.4+).
+// Αν κλειδώσεις εσύ το κινητό, αφήνεται και ξαναζητείται όταν γυρίσεις.
+let wakeLock = null;
+async function keepAwake() {
+  if (!getSetting('keepAwake') || !('wakeLock' in navigator) || document.hidden || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch { wakeLock = null; }
+}
+function releaseAwake() {
+  try { if (wakeLock) wakeLock.release(); } catch { /* τίποτα */ }
+  wakeLock = null;
 }
 
 // Προσθέτει στο awayMs τον χρόνο από τότε που βγήκες (έως το τέλος της συνεδρίας)
@@ -164,6 +218,7 @@ function showOverlay() {
   renderRunning();
   clearInterval(ticker);
   ticker = setInterval(tick, 250);
+  keepAwake();
   tick();
 }
 
@@ -173,6 +228,8 @@ function hideOverlay() {
   if (overlay) overlay.remove();
   overlay = null;
   document.body.classList.remove('locked');
+  releaseAwake();
+  stopRinging();
 }
 
 function renderRunning() {
@@ -206,8 +263,14 @@ function tick() {
   const now = Date.now();
   if (now >= a.endsAt) {
     const session = finish(null);
-    if (document.hidden) pendingChime = true; else chime();
-    renderResult(session);
+    // Τελείωσε τώρα μπροστά σου: ξυπνητήρι. Τελείωσε όσο έλειπες: απλώς το αποτέλεσμα
+    // (με το "Ring on the lock screen" έχει ήδη χτυπήσει το timer του iPhone).
+    if (!document.hidden && now - a.endsAt < 5000) {
+      renderRinging(session);
+    } else {
+      if (document.hidden) pendingChime = !getSetting('lockAlarm'); else if (!getSetting('lockAlarm')) chime();
+      renderResult(session);
+    }
     return;
   }
   if (overlay.dataset.view !== 'running') return;
@@ -284,6 +347,7 @@ function renderConfirm() {
     finish(reason);
     hideOverlay();
     toast(message);
+    if (getSetting('lockAlarm')) toast('Also cancel the timer in Clock');
     refresh();
   };
   overlay.querySelector('[data-keep]').addEventListener('click', renderRunning);
@@ -296,9 +360,85 @@ function renderConfirm() {
   });
 }
 
+// ===================== Ξυπνητήρι: "slide to stop" =====================
+let stopSound = null;
+function stopRinging() {
+  if (stopSound) stopSound();
+  stopSound = null;
+}
+
+function renderRinging(session) {
+  clearInterval(ticker);
+  ticker = null;
+  ensureOverlay();
+  overlay.dataset.view = 'ringing';
+  overlay.innerHTML = `
+    <div class="focus-inner running">
+      <p class="focus-activity">${icon(ACTIVITIES[session.activity].icon)} ${ACTIVITIES[session.activity].label}</p>
+      <p class="alarm-title">Time's up</p>
+      <p class="muted">${session.minutes} ${session.minutes === 1 ? 'minute' : 'minutes'} done</p>
+    </div>
+    <div class="slide-stop" role="button" tabindex="0" aria-label="Slide to stop the alarm">
+      <span class="slide-label">slide to stop</span>
+      <span class="slide-thumb" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </span>
+    </div>`;
+  stopRinging();
+  stopSound = alarm();
+  bindSlide(overlay.querySelector('.slide-stop'), () => {
+    stopRinging();
+    renderResult(session);
+  });
+}
+
+// Σύρσιμο του κουμπιού προς τα δεξιά, όπως στο ξυπνητήρι του iPhone
+function bindSlide(track, onDone) {
+  const thumb = track.querySelector('.slide-thumb');
+  let grabX = null;
+  let x = 0;
+  let max = 0;
+  let done = false;
+  const set = (v, animate) => {
+    x = v;
+    thumb.style.transition = animate ? 'transform 0.35s var(--spring)' : 'none';
+    thumb.style.transform = `translateX(${v}px)`;
+    track.style.setProperty('--p', max ? v / max : 0);
+  };
+  const finishSlide = () => {
+    if (done) return;
+    done = true;
+    haptic();
+    onDone();
+  };
+  thumb.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    max = track.clientWidth - thumb.offsetWidth - 12;
+    grabX = e.clientX - x;
+    try { thumb.setPointerCapture(e.pointerId); } catch { /* συνεχίζουμε και χωρίς */ }
+  });
+  thumb.addEventListener('pointermove', (e) => {
+    if (grabX === null) return;
+    set(Math.max(0, Math.min(max, e.clientX - grabX)));
+  });
+  const release = () => {
+    if (grabX === null) return;
+    grabX = null;
+    if (x >= max * 0.85) { set(max, true); finishSlide(); } else set(0, true);
+  };
+  thumb.addEventListener('pointerup', release);
+  thumb.addEventListener('pointercancel', release);
+  // Από πληκτρολόγιο / VoiceOver: Enter ή Space
+  track.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finishSlide(); }
+  });
+  track.addEventListener('click', (e) => { if (e.detail === 0) finishSlide(); }); // "πάτημα" του VoiceOver
+}
+
 function renderResult(session) {
   clearInterval(ticker);
   ticker = null;
+  releaseAwake();
   ensureOverlay();
   overlay.dataset.view = 'result';
   overlay.innerHTML = `
@@ -335,7 +475,7 @@ document.addEventListener('visibilitychange', () => {
     closeAway(a);
   }
   saveActive(a);
-  if (!document.hidden) tick();
+  if (!document.hidden) { keepAwake(); tick(); }
 });
 
 // ===================== Οθόνη επιλογής =====================

@@ -11,6 +11,8 @@ const DEFAULTS = {
   sound: true,      // ήχοι (τροχός, τέλος συνεδρίας)
   haptics: true,    // δόνηση (όπου την υποστηρίζει το iPhone)
   autoBackup: true, // καθημερινό αντίγραφο μέσα στο app
+  keepAwake: true,  // η οθόνη μένει ανοιχτή όσο τρέχει focus (για να χτυπήσει το ξυπνητήρι)
+  lockAlarm: false, // ξυπνητήρι του iPhone μέσω Shortcuts (χτυπά και με κλειδωμένο κινητό)
 };
 
 export function getSetting(name) {

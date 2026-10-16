@@ -221,6 +221,12 @@ function renderSettings(el) {
       ${toggleRow('haptics', 'Haptics', 'Small vibrations, on iPhone with iOS 18 or later')}
     </ul>
 
+    <h2 class="section-title">Focus alarm</h2>
+    <ul class="list">
+      ${toggleRow('keepAwake', 'Keep screen on', 'During focus the screen stays on, so the alarm rings in the app')}
+      ${toggleRow('lockAlarm', 'Ring on the lock screen', 'Also starts an iPhone timer through Shortcuts. Needs a one-time setup')}
+    </ul>
+
     <h2 class="section-title">Features</h2>
     <ul class="list">${group('Features')}</ul>
 

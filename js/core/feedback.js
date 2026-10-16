@@ -79,6 +79,55 @@ export async function chime() {
   } catch { /* χωρίς ήχο */ }
 }
 
+// Ξυπνητήρι στο τέλος του focus: επαναλαμβανόμενο μοτίβο σαν του Ρολογιού του iPhone.
+// Είναι ξυπνητήρι, όχι "εφέ", οπότε παίζει ακόμα κι αν έχεις κλείσει τα Sound effects.
+// Με audioSession 'playback' (Safari 16.4+) ακούγεται και με τον διακόπτη σίγασης.
+// Επιστρέφει μια συνάρτηση που το σταματά. Σταματά και μόνο του μετά από 2 λεπτά.
+export function alarm() {
+  let stopped = false;
+  const session = navigator.audioSession;
+  const prevType = session ? session.type : null;
+  try { if (session) session.type = 'playback'; } catch { /* παλιό iOS */ }
+
+  const ring = async () => {
+    if (stopped) return;
+    haptic();
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state !== 'running') await audio.resume();
+      const t = audio.currentTime + 0.02;
+      // Γρήγορο "ντι-ντου-ντι-ντου": δύο νότες που εναλλάσσονται
+      [1318.5, 1568, 1318.5, 1568, 1318.5, 1568].forEach((f, i) => {
+        const start = t + i * 0.13;
+        [[f, 0.32], [f * 2, 0.06]].forEach(([freq, level]) => { // + μια οκτάβα πάνω, για "λάμψη"
+          const osc = audio.createOscillator();
+          const gain = audio.createGain();
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(level, start + 0.01);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.12);
+          osc.connect(gain).connect(audio.destination);
+          osc.start(start);
+          osc.stop(start + 0.13);
+        });
+      });
+    } catch { /* χωρίς ήχο */ }
+  };
+
+  function stop() {
+    if (stopped) return;
+    stopped = true;
+    clearInterval(loop);
+    clearTimeout(limit);
+    try { if (session) session.type = prevType || 'auto'; } catch { /* τίποτα */ }
+  }
+
+  ring();
+  const loop = setInterval(ring, 1400);
+  const limit = setTimeout(stop, 120000);
+  return stop;
+}
+
 // "Φσσς": θόρυβος που ανεβαίνει (σκίσιμο pack, εμφάνιση walkout)
 export function whoosh() {
   haptic();
