@@ -2334,7 +2334,6 @@ body.no-tabbar .wk-pill { bottom: calc(var(--safe-bottom) + 14px); }
 .ft-week p { margin: 0; font-size: 20px; }
 .ft-range { color: var(--blue); font-weight: 600; font-size: 15px; }
 .ft-chart { position: relative; margin-top: 10px; padding: 14px 12px 8px; background: var(--surface); border: 1px solid var(--glass-edge); border-radius: 22px; box-shadow: var(--shadow); }
-.ft-chart-max { position: absolute; top: 8px; left: 12px; font-size: 12px; }
 .ft-bars { display: flex; align-items: flex-end; gap: 6px; height: 150px; padding-top: 18px; border-bottom: 1px solid var(--line); }
 .ft-bar {
   flex: 1;
@@ -2407,3 +2406,10 @@ button.ft-range .icon { width: 18px; height: 18px; }
 .ft-hist-sets td { padding: 4px 6px; text-align: center; border-top: 1px solid var(--line); font-weight: 600; }
 .ft-hist-sets th:first-child, .ft-hist-sets td:first-child { width: 44px; text-align: left; }
 .ft-hist-sets .wk-type { width: 26px; height: 26px; font-size: 14px; cursor: default; }
+
+/* Πάτημα σε στήλη του γραφήματος: η ακριβής τιμή και πότε ήταν */
+.ft-chart-info { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-height: 24px; margin: 0 0 2px; font-size: 14px; }
+.ft-chart-info strong { font-size: 18px; color: var(--blue); }
+.ft-bar { padding: 0; border: none; cursor: pointer; transition: opacity 0.25s, filter 0.25s; }
+.ft-chart.has-pick .ft-bar { opacity: 0.35; }
+.ft-chart.has-pick .ft-bar.picked { opacity: 1; filter: saturate(1.3); box-shadow: 0 0 0 2px var(--blue); }

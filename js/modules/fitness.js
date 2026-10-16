@@ -384,18 +384,45 @@ function chartTotals() {
   return bars;
 }
 
+// Η τιμή μιας στήλης με ακρίβεια: "2h 18m", "6,017 kg", "124 reps"
+function exactValue(v) {
+  if (metric === 'duration') return v ? durationText(v * 3600000) : '0 min';
+  if (metric === 'volume') return fmtVolume(v);
+  return `${Math.round(v)} reps`;
+}
+
+// Πότε ήταν μια στήλη: "21–27 Sept, 3 weeks ago" ή "Wed 14 Oct, 2 days ago"
+function whenText(start) {
+  const r = RANGES[range];
+  const fmt = (ts, o) => new Date(ts).toLocaleDateString('en-GB', o);
+  if (r.step === 'week') {
+    const end = start + 6 * DAY;
+    const ago = Math.round((chartTotals().at(-1).start - start) / (7 * DAY));
+    const rel = ago === 0 ? 'this week' : ago === 1 ? 'last week' : `${ago} weeks ago`;
+    return `${fmt(start, { day: 'numeric' })}–${fmt(end, { day: 'numeric', month: 'short' })}, ${rel}`;
+  }
+  const ago = Math.round((chartTotals().at(-1).start - start) / DAY);
+  const rel = ago === 0 ? 'today' : ago === 1 ? 'yesterday' : ago >= 7 ? `${Math.floor(ago / 7)} ${Math.floor(ago / 7) === 1 ? 'week' : 'weeks'} ago` : `${ago} days ago`;
+  return `${fmt(start, { weekday: 'short', day: 'numeric', month: 'short' })}, ${rel}`;
+}
+
+let picked = null; // η στήλη που πάτησες (θέση)
+
 function chartHtml() {
   const r = RANGES[range];
   const bars = chartTotals();
   const values = bars.map((b) => b[metric]);
   const max = Math.max(...values, 1);
-  const unit = { duration: (v) => `${Math.round(v * 10) / 10} h`, volume: (v) => fmtVolume(v), reps: (v) => `${Math.round(v)} reps` }[metric];
   const label = (ts) => new Date(ts).toLocaleDateString('en-GB', r.bars === 7 ? { weekday: 'short' } : { day: 'numeric', month: 'short' });
+  const sel = picked !== null && picked < bars.length ? picked : null;
   return `
-    <div class="ft-chart" role="img" aria-label="${metric}, ${r.label.toLowerCase()}">
-      <span class="ft-chart-max muted">${unit(max)}</span>
+    <div class="ft-chart ${sel !== null ? 'has-pick' : ''}">
+      <p class="ft-chart-info" aria-live="polite">${sel !== null
+        ? `<strong>${exactValue(values[sel])}</strong><span class="muted">${whenText(bars[sel].start)}</span>`
+        : `<span class="muted">Tap a bar to see the details</span>`}</p>
       <div class="ft-bars ${r.bars > 20 ? 'thin' : ''}">${values.map((v, i) => `
-        <span class="ft-bar" style="--h:${max ? (v / max) * 100 : 0}%; --i:${i}" title="${label(bars[i].start)}: ${unit(v)}"></span>`).join('')}
+        <button class="ft-bar ${sel === i ? 'picked' : ''}" data-bar="${i}" style="--h:${max ? (v / max) * 100 : 0}%; --i:${i}"
+                aria-label="${label(bars[i].start)}: ${exactValue(v)}"></button>`).join('')}
       </div>
       <div class="ft-chart-x muted">${r.ticks.map((i) => `<span>${label(bars[i].start)}</span>`).join('')}</div>
     </div>`;
@@ -470,9 +497,15 @@ function renderProfile(el, params) {
       navigate(`fitness/w/${b.dataset.open}`);
     } else if ('rangeOpen' in b.dataset) {
       rangeSheet(() => {
+        picked = null;
         el.querySelector('#ft-chart').innerHTML = chartHtml();
         b.innerHTML = `${RANGES[range].label} ${icon(MORE_ICONS.caret)}`;
       });
+    } else if (b.dataset.bar) {
+      const i = Number(b.dataset.bar);
+      picked = picked === i ? null : i; // πάτημα ξανά στην ίδια στήλη: κλείνει
+      el.querySelector('#ft-chart').innerHTML = chartHtml();
+      el.querySelectorAll('.ft-bar').forEach((x) => { x.style.animation = 'none'; }); // χωρίς ξαναφούσκωμα
     } else if (b.dataset.metric) {
       metric = b.dataset.metric;
       el.querySelector('#ft-chart').innerHTML = chartHtml();
@@ -715,5 +748,5 @@ register({
   nav: true,
   home: false,
   render: renderProfile,
-  unmount() { calMonth = null; historyShown = HISTORY_PAGE; },
+  unmount() { calMonth = null; historyShown = HISTORY_PAGE; picked = null; },
 });
