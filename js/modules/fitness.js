@@ -3,7 +3,7 @@
 // ΚΑΡΤΕΛΕΣ
 //   Home     οι προπονήσεις σου, η πιο πρόσφατη πρώτη (#/fitness, #/fitness/w/<id>)
 //   Workout  Start Empty Workout και τα routines σου (#/workout, #/workout/routine/<id|new>)
-//   Profile  σύνολα, γράφημα 3 μηνών και Dashboard: Statistics, Exercises,
+//   Profile  σύνολα, γράφημα (7 μέρες / μήνας / 3 μήνες) και Dashboard: Statistics, Exercises,
 //            Measures, Calendar (#/profile, #/profile/<σελίδα>)
 //
 // Δεδομένα: όσα του workout.js (moduleStore('workout')) και
@@ -344,38 +344,71 @@ function renderRoutine(el, id) {
 
 // ===================== Profile =====================
 
-const WEEKS = 13; // περίπου 3 μήνες
+// Το γράφημα: τι δείχνει (metric) και για πόσο διάστημα (range)
 let metric = 'duration';
+let range = 'quarter';
+// 7 days και a month: μία στήλη ανά μέρα. 3 months: μία στήλη ανά εβδομάδα.
+const RANGES = {
+  week: { label: 'Last 7 days', bars: 7, step: 'day', ticks: [0, 3, 6] },
+  month: { label: 'Last month', bars: 30, step: 'day', ticks: [0, 10, 20, 29] },
+  quarter: { label: 'Last 3 months', bars: 13, step: 'week', ticks: [0, 4, 8, 12] },
+};
 
-// Ανά εβδομάδα (Δευτέρα-Κυριακή): διάρκεια (h), όγκος (kg), reps
-function weeklyTotals() {
-  const monday = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); };
-  const thisWeek = monday(Date.now());
-  const weeks = Array.from({ length: WEEKS }, (_, i) => ({ start: thisWeek - (WEEKS - 1 - i) * 7 * DAY, duration: 0, volume: 0, reps: 0 }));
+// Σύνολα ανά στήλη: διάρκεια (h), όγκος (kg), reps
+function chartTotals() {
+  const r = RANGES[range];
+  const startOf = (ts) => {
+    const d = new Date(ts);
+    d.setHours(0, 0, 0, 0);
+    if (r.step === 'week') d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // Δευτέρα
+    return d.getTime();
+  };
+  const stepMs = (r.step === 'week' ? 7 : 1) * DAY;
+  const last = startOf(Date.now());
+  const bars = Array.from({ length: r.bars }, (_, i) => ({ start: last - (r.bars - 1 - i) * stepMs, duration: 0, volume: 0, reps: 0 }));
   for (const w of getHistory()) {
-    const k = weeks.findIndex((x) => x.start === monday(w.startedAt));
+    const s = startOf(w.startedAt);
+    // Με αλλαγή ώρας μια "μέρα" μπορεί να μην είναι ακριβώς 24 ώρες: ψάχνουμε την πιο κοντινή στήλη
+    const k = bars.findIndex((x) => Math.abs(x.start - s) < stepMs / 2);
     if (k < 0) continue;
-    weeks[k].duration += (w.endedAt - w.startedAt) / 3600000;
-    weeks[k].volume += volumeOf(w.exercises);
-    weeks[k].reps += w.exercises.reduce((n, e) => n + e.sets.reduce((m, s) => m + (s.reps || 0), 0), 0);
+    bars[k].duration += (w.endedAt - w.startedAt) / 3600000;
+    bars[k].volume += volumeOf(w.exercises);
+    bars[k].reps += w.exercises.reduce((n, e) => n + e.sets.reduce((m, x) => m + (x.reps || 0), 0), 0);
   }
-  return weeks;
+  return bars;
 }
 
 function chartHtml() {
-  const weeks = weeklyTotals();
-  const values = weeks.map((w) => w[metric]);
-  const max = Math.max(...values, metric === 'duration' ? 1 : 1);
+  const r = RANGES[range];
+  const bars = chartTotals();
+  const values = bars.map((b) => b[metric]);
+  const max = Math.max(...values, 1);
   const unit = { duration: (v) => `${Math.round(v * 10) / 10} h`, volume: (v) => fmtVolume(v), reps: (v) => `${Math.round(v)} reps` }[metric];
-  const label = (ts) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const label = (ts) => new Date(ts).toLocaleDateString('en-GB', r.bars === 7 ? { weekday: 'short' } : { day: 'numeric', month: 'short' });
   return `
-    <div class="ft-chart" role="img" aria-label="${metric} per week, last 3 months">
+    <div class="ft-chart" role="img" aria-label="${metric}, ${r.label.toLowerCase()}">
       <span class="ft-chart-max muted">${unit(max)}</span>
-      <div class="ft-bars">${values.map((v, i) => `
-        <span class="ft-bar" style="--h:${max ? (v / max) * 100 : 0}%; --i:${i}" title="${label(weeks[i].start)}: ${unit(v)}"></span>`).join('')}
+      <div class="ft-bars ${r.bars > 20 ? 'thin' : ''}">${values.map((v, i) => `
+        <span class="ft-bar" style="--h:${max ? (v / max) * 100 : 0}%; --i:${i}" title="${label(bars[i].start)}: ${unit(v)}"></span>`).join('')}
       </div>
-      <div class="ft-chart-x muted">${[0, 4, 8, 12].map((i) => `<span>${label(weeks[i].start)}</span>`).join('')}</div>
+      <div class="ft-chart-x muted">${r.ticks.map((i) => `<span>${label(bars[i].start)}</span>`).join('')}</div>
     </div>`;
+}
+
+// Επιλογή διαστήματος (σαν το "Last 3 months ⌄" του Hevy)
+function rangeSheet(after) {
+  openSheet(`
+    <h2>Show</h2>
+    <div class="stack wk-menu">${Object.entries(RANGES).map(([id, r]) => `
+      <button class="btn btn-quiet btn-block ${range === id ? 'selected' : ''}" data-range="${id}">${r.label}</button>`).join('')}
+    </div>`,
+  (root, close) => root.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-range]');
+    if (!b) return;
+    range = b.dataset.range;
+    close();
+    after();
+  }));
 }
 
 function renderProfile(el, params) {
@@ -403,7 +436,7 @@ function renderProfile(el, params) {
 
     <div class="ft-week">
       <p><strong>${thisWeekMin < 60 ? `${thisWeekMin} mins` : durationText(thisWeekMin * 60000)}</strong> <span class="muted">this week</span></p>
-      <span class="ft-range">Last 3 months</span>
+      <button class="ft-range" data-range-open>${RANGES[range].label} ${icon(MORE_ICONS.caret)}</button>
     </div>
     <div id="ft-chart">${chartHtml()}</div>
     <div class="ft-metrics" role="radiogroup" aria-label="Chart">
@@ -421,7 +454,12 @@ function renderProfile(el, params) {
   el.onclick = (ev) => {
     const b = ev.target.closest('button');
     if (!b) return;
-    if (b.dataset.metric) {
+    if ('rangeOpen' in b.dataset) {
+      rangeSheet(() => {
+        el.querySelector('#ft-chart').innerHTML = chartHtml();
+        b.innerHTML = `${RANGES[range].label} ${icon(MORE_ICONS.caret)}`;
+      });
+    } else if (b.dataset.metric) {
       metric = b.dataset.metric;
       el.querySelector('#ft-chart').innerHTML = chartHtml();
       el.querySelectorAll('[data-metric]').forEach((c) => { c.classList.toggle('selected', c === b); c.setAttribute('aria-checked', c === b); });

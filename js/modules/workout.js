@@ -198,11 +198,50 @@ async function discardWorkout() {
   refresh();
 }
 
+// Με τι μοιάζει ο συνολικός όγκος της προπόνησης (κιλά, περίπου)
+const LIFT_LIKE = [
+  { kg: 4, emoji: '🐈', one: 'a house cat', many: 'house cats' },
+  { kg: 30, emoji: '🐕', one: 'a golden retriever', many: 'golden retrievers' },
+  { kg: 75, emoji: '🧺', one: 'a washing machine', many: 'washing machines' },
+  { kg: 110, emoji: '🐼', one: 'a giant panda', many: 'giant pandas' },
+  { kg: 190, emoji: '🦁', one: 'a lion', many: 'lions' },
+  { kg: 400, emoji: '🎹', one: 'a grand piano', many: 'grand pianos' },
+  { kg: 500, emoji: '🐎', one: 'a horse', many: 'horses' },
+  { kg: 750, emoji: '🐄', one: 'a cow', many: 'cows' },
+  { kg: 1200, emoji: '🚗', one: 'a car', many: 'cars' },
+  { kg: 1500, emoji: '🦛', one: 'a hippo', many: 'hippos' },
+  { kg: 2300, emoji: '🦏', one: 'a rhino', many: 'rhinos' },
+  { kg: 5000, emoji: '🐘', one: 'an elephant', many: 'elephants' },
+  { kg: 8000, emoji: '🦖', one: 'a T-rex', many: 'T-rexes' },
+  { kg: 12000, emoji: '🚌', one: 'a school bus', many: 'school buses' },
+  { kg: 30000, emoji: '🐋', one: 'a humpback whale', many: 'humpback whales' },
+  { kg: 150000, emoji: '🐳', one: 'a blue whale', many: 'blue whales' },
+];
+
+function liftedLike(kg) {
+  const fit = LIFT_LIKE.filter((x) => kg >= x.kg).at(-1);
+  if (!fit) return null;
+  const times = Math.floor(kg / fit.kg);
+  return { emoji: fit.emoji, text: times >= 2 ? `${times} ${fit.many}` : fit.one };
+}
+
+// 1st, 2nd, 3rd, 4th ... 11th, 12th, 13th, 21st
+function ordinal(n) {
+  const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : { 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th';
+  return `${n}${s}`;
+}
+
 function showSummary(w, records) {
+  const kg = volumeOf(w.exercises);
+  const like = liftedLike(kg);
+  const nth = getHistory().length;
   openSheet(`
     <div class="wk-summary">
-      <span class="wk-summary-badge">${icon(ICONS.check)}</span>
-      <h2>Workout complete</h2>
+      <span class="wk-summary-emoji" aria-hidden="true">${like ? like.emoji : '💪'}</span>
+      <h2>Nice work!</h2>
+      <p class="wk-summary-line">This is your <strong>${ordinal(nth)}</strong> workout.</p>
+      ${kg ? `<p class="wk-summary-line">You lifted a total of <strong>${fmtVolume(kg)}</strong>.</p>` : ''}
+      ${like ? `<p class="wk-summary-like">That's like lifting ${like.text}!</p>` : ''}
       <p class="muted">${escapeHtml(w.name)}</p>
       <div class="wk-stats">
         <div><strong>${durationText(w.endedAt - w.startedAt)}</strong><span>Duration</span></div>

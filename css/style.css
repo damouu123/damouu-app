@@ -2366,3 +2366,15 @@ body.no-tabbar .wk-pill { bottom: calc(var(--safe-bottom) + 14px); }
 .ft-tiles .ft-tile { padding: 0 14px; font-size: 15px; white-space: nowrap; }
 .ft-tiles .ft-tile .icon { width: 22px; height: 22px; }
 .ft-profile-stats { font-size: 16px; }
+
+/* Επιλογή διαστήματος του γραφήματος */
+button.ft-range { display: inline-flex; align-items: center; gap: 2px; padding: 4px 0; border: none; background: none; font: inherit; font-weight: 600; font-size: 15px; color: var(--blue); cursor: pointer; }
+button.ft-range .icon { width: 18px; height: 18px; }
+.ft-bars.thin { gap: 2px; }
+.ft-bars.thin .ft-bar { border-radius: 3px 3px 1px 1px; }
+
+/* Σύνοψη στο τέλος της προπόνησης */
+.wk-summary-emoji { font-size: 64px; line-height: 1.1; animation: emoji-pop 0.8s var(--spring) both; }
+@keyframes emoji-pop { 0% { transform: scale(0.3) rotate(-12deg); opacity: 0; } 70% { transform: scale(1.15) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
+.wk-summary-line { margin: 2px 0 0 !important; font-size: 17px; }
+.wk-summary-like { margin: 10px 0 6px !important; font-size: 18px; font-weight: 700; color: var(--accent); }
