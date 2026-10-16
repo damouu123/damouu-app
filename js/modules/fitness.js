@@ -17,6 +17,7 @@ import {
   ICONS, SET_TYPES, DEFAULT_REST, DEFAULT_SETS,
   uid, allExercises, exById, exTitle, fmtKg, fmtVolume, durationText, volumeOf, setsCount,
   bestSet, setText, getHistory, getRoutines, getActive, startWorkout, openLog, pickExercises,
+  restSheet, restText,
 } from './workout.js';
 
 const store = moduleStore('workout');
@@ -292,7 +293,8 @@ function renderRoutine(el, id) {
         <li><div class="row row-static">
           ${exAvatar(exById(e.exerciseId))}
           <span class="row-text"><span class="row-title">${escapeHtml(exTitle(exById(e.exerciseId)))}</span>
-            <span class="row-sub">${e.sets} ${e.sets === 1 ? 'set' : 'sets'}</span></span>
+            <span class="row-sub">${e.sets} ${e.sets === 1 ? 'set' : 'sets'}</span>
+            <button class="wk-rest-chip" data-rest="${i}">${icon(ICONS.timer)} Rest: ${restText(e.rest ?? DEFAULT_REST)}</button></span>
           <span class="wk-stepper">
             <button class="icon-btn" data-sets="${i}:-1" aria-label="Fewer sets">−</button>
             <button class="icon-btn" data-sets="${i}:1" aria-label="More sets">+</button>
@@ -314,6 +316,9 @@ function renderRoutine(el, id) {
       const [i, d] = b.dataset.sets.split(':').map(Number);
       draft.exercises[i].sets = Math.min(10, Math.max(1, draft.exercises[i].sets + d));
       renderRoutine(el, id);
+    } else if (b.dataset.rest) {
+      const e = draft.exercises[Number(b.dataset.rest)];
+      restSheet(e.rest ?? DEFAULT_REST, exTitle(exById(e.exerciseId)), (seconds) => { e.rest = seconds; renderRoutine(el, id); });
     } else if (b.dataset.remove) {
       draft.exercises.splice(Number(b.dataset.remove), 1);
       renderRoutine(el, id);

@@ -2378,3 +2378,7 @@ button.ft-range .icon { width: 18px; height: 18px; }
 @keyframes emoji-pop { 0% { transform: scale(0.3) rotate(-12deg); opacity: 0; } 70% { transform: scale(1.15) rotate(4deg); opacity: 1; } 100% { transform: scale(1) rotate(0); } }
 .wk-summary-line { margin: 2px 0 0 !important; font-size: 17px; }
 .wk-summary-like { margin: 10px 0 6px !important; font-size: 18px; font-weight: 700; color: var(--accent); }
+
+/* Τροχός ξεκούρασης μέσα στο φύλλο */
+.wk-rest-wheel .wheel { margin-top: 14px; }
+.wk-routine-list .wk-rest-chip { align-self: flex-start; }

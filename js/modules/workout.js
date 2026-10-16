@@ -23,11 +23,13 @@
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, navigate, toast, openSheet, ask, refresh } from '../core/router.js';
 import { chime, haptic } from '../core/feedback.js';
+import { mountWheel } from '../core/wheel.js';
 import { EXERCISES, MUSCLES } from '../../data/exercises.js';
 
 const store = moduleStore('workout');
 
-const REST_OPTIONS = [0, 30, 60, 90, 120, 180, 240];
+// Χρονόμετρο ξεκούρασης: από 5" έως 5', ανά 5" (σε δευτερόλεπτα)
+const REST_VALUES = Array.from({ length: 60 }, (_, i) => (i + 1) * 5);
 const DEFAULT_REST = 90; // δευτερόλεπτα
 const DEFAULT_SETS = 3;
 const SET_TYPES = {
@@ -60,6 +62,7 @@ const num = (v) => {
 };
 const fmtKg = (n) => (n === null || n === undefined ? '' : String(Math.round(n * 100) / 100));
 const fmtVolume = (kg) => `${Math.round(kg).toLocaleString('en-GB')} kg`;
+const restText = (s) => (s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Off');
 
 // Διάρκεια: "12:34" ή "1:02:34" (ζωντανά), "1h 2m" (σύνοψη)
 function clockText(ms) {
@@ -318,7 +321,7 @@ function exerciseHtml(ex) {
       <header class="wk-ex-head">
         <div>
           <h3>${escapeHtml(exTitle(e))}</h3>
-          <button class="wk-rest-chip" data-act="rest">${icon(ICONS.timer)} Rest: ${ex.rest ? `${Math.floor(ex.rest / 60)}:${String(ex.rest % 60).padStart(2, '0')}` : 'Off'}</button>
+          <button class="wk-rest-chip" data-act="rest">${icon(ICONS.timer)} Rest: ${restText(ex.rest)}</button>
         </div>
         <button class="wk-icon-btn" data-act="ex-menu" aria-label="Exercise options">${icon(ICONS.dots)}</button>
       </header>
@@ -499,21 +502,39 @@ function bindLog() {
   });
 }
 
-function chooseRest(ex) {
+// Επιλογή ξεκούρασης με τροχό (σαν του Focus). done(δευτερόλεπτα, ή 0 = Off)
+function restSheet(current, exerciseName, done) {
   openSheet(`
     <h2>Rest timer</h2>
-    <p class="muted">${escapeHtml(exTitle(exById(ex.exerciseId)))}. Starts when you complete a set.</p>
-    <div class="chips wk-rest-options">${REST_OPTIONS.map((s) => `
-      <button class="chip ${ex.rest === s ? 'selected' : ''}" data-rest="${s}">${s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : 'Off'}</button>`).join('')}
+    <p class="muted">${escapeHtml(exerciseName)}. Starts when you complete a set.</p>
+    <div class="wk-rest-wheel"></div>
+    <div class="stack">
+      <button class="btn btn-block" data-set>Set rest</button>
+      <button class="link-btn centered" data-off>Turn off rest timer</button>
     </div>`,
-  (root, close) => root.addEventListener('click', (ev) => {
-    const b = ev.target.closest('[data-rest]');
-    if (!b) return;
+  (root, close) => {
+    const wheel = mountWheel(root.querySelector('.wk-rest-wheel'), {
+      values: REST_VALUES,
+      value: REST_VALUES.includes(current) ? current : DEFAULT_REST,
+      format: restText,
+      label: 'Rest time',
+      onChange: (s) => { root.querySelector('[data-set]').textContent = `Set rest to ${restText(s)}`; },
+    });
+    root.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b) return;
+      if ('set' in b.dataset) { close(); done(wheel.get()); }
+      else if ('off' in b.dataset) { close(); done(0); }
+    });
+  });
+}
+
+function chooseRest(ex) {
+  restSheet(ex.rest, exTitle(exById(ex.exerciseId)), (seconds) => {
     const a = getActive();
     const cur = a && a.exercises.find((x) => x.uid === ex.uid);
-    if (cur) { cur.rest = Number(b.dataset.rest); saveActive(a); renderLog(); }
-    close();
-  }));
+    if (cur) { cur.rest = seconds; saveActive(a); renderLog(); }
+  });
 }
 
 function setTypeMenu(ex, set) {
@@ -685,6 +706,7 @@ export {
   ICONS, SET_TYPES, DEFAULT_REST, DEFAULT_SETS,
   uid, allExercises, exById, exTitle, fmtKg, fmtVolume, durationText, volumeOf, setsCount,
   bestSet, setText, getHistory, getRoutines, getActive, startWorkout, openLog, pickExercises,
+  restSheet, restText,
 };
 
 // Αν το app άνοιξε με προπόνηση σε εξέλιξη: το κουμπί "Workout 12:34" για να γυρίσεις
