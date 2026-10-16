@@ -1,11 +1,10 @@
 // Workout (ενότητα Fitness): καταγραφή προπόνησης με λογική παρόμοια με του Hevy.
 //
 // ΡΟΗ
-//   Workout (καρτέλα)   ξεκινάς άδεια προπόνηση ή ένα routine σου
+//   (Οι σελίδες Home / Workout / Profile είναι στο fitness.js. Εδώ ζει η καταγραφή.)
 //   Καταγραφή           οθόνη που καλύπτει το app: ασκήσεις, σετ (kg × reps, ✓),
 //                       διάρκεια, όγκος, χρονόμετρο ξεκούρασης. Με ⌄ την "κατεβάζεις"
 //                       και μένει ένα κουμπί "Workout 12:34" για να γυρίσεις.
-//   History (καρτέλα)   οι προπονήσεις που ολοκλήρωσες
 //
 // Η "Previous" στήλη δείχνει τι έκανες στο ίδιο σετ την τελευταία φορά.
 // Πατώντας την, συμπληρώνονται kg και reps.
@@ -16,12 +15,11 @@
 // Δεδομένα (moduleStore('workout')):
 //   active    { id, name, startedAt, rest: { endsAt, total } | null,
 //               exercises: [{ uid, exerciseId, rest, sets: [{ uid, type, kg, reps, done }] }] }
-//   history   [{ id, name, startedAt, endedAt, exercises: [{ exerciseId, sets: [{ type, kg, reps }] }] }]
+//   history   [{ id, name, startedAt, endedAt, records, exercises: [{ exerciseId, sets: [{ type, kg, reps }] }] }]
 //   routines  [{ id, name, exercises: [{ exerciseId, sets, rest }] }]
 //   custom    δικές σου ασκήσεις [{ id, name, equipment, muscle }]
 //   type: 'normal' | 'warmup' | 'drop' | 'failure'
 
-import { register } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, navigate, toast, openSheet, ask, refresh } from '../core/router.js';
 import { chime, haptic } from '../core/feedback.js';
@@ -62,8 +60,6 @@ const num = (v) => {
 };
 const fmtKg = (n) => (n === null || n === undefined ? '' : String(Math.round(n * 100) / 100));
 const fmtVolume = (kg) => `${Math.round(kg).toLocaleString('en-GB')} kg`;
-// Σύντομα, για μικρά κουτάκια: "960 kg", "12.4 t"
-const shortVolume = (kg) => (kg < 1000 ? `${Math.round(kg)} kg` : `${Math.round(kg / 100) / 10} t`);
 
 // Διάρκεια: "12:34" ή "1:02:34" (ζωντανά), "1h 2m" (σύνοψη)
 function clockText(ms) {
@@ -184,6 +180,7 @@ async function finishWorkout() {
     if (prevBest !== null && now > prevBest) records.push(exTitle(exById(ex.exerciseId)));
   }
 
+  saved.records = records.length;
   store.update('history', (list) => [...list, saved], []);
   store.remove('active');
   closeLog();
@@ -643,237 +640,13 @@ function updatePill() {
   }
 }
 
-// ===================== Καρτέλα Workout =====================
+// ===================== Για τις σελίδες του Fitness (fitness.js) =====================
 
-const routineCard = (r) => `
-  <li class="wk-routine">
-    <button class="wk-routine-main" data-edit="${r.id}">
-      <strong>${escapeHtml(r.name)}</strong>
-      <span class="muted">${escapeHtml(r.exercises.map((e) => exById(e.exerciseId).name).join(', ') || 'No exercises')}</span>
-    </button>
-    <button class="btn btn-small wk-start-routine" data-start="${r.id}" ${r.exercises.length ? '' : 'disabled'}>Start Routine</button>
-  </li>`;
-
-function renderHome(el) {
-  const a = getActive();
-  const weekAgo = Date.now() - 7 * 86400000;
-  const week = getHistory().filter((w) => w.startedAt >= weekAgo);
-  const weekTime = week.reduce((t, w) => t + (w.endedAt - w.startedAt), 0);
-  const routines = getRoutines();
-  el.innerHTML = `
-    ${a ? `
-      <div class="banner banner-flow wk-progress" role="status">
-        <div class="banner-body">
-          <p class="banner-title">Workout in progress</p>
-          <p class="banner-text">${escapeHtml(a.name)}</p>
-        </div>
-        <button class="btn btn-small" data-resume>Resume</button>
-      </div>` : ''}
-
-    <h2 class="section-title first">Quick start</h2>
-    <button class="btn btn-block wk-start" data-empty>${icon(ICONS.plus)} Start Empty Workout</button>
-
-    <div class="wk-section-head">
-      <h2 class="section-title">Routines</h2>
-      <button class="btn btn-small btn-quiet" data-new-routine>${icon(ICONS.plus)} New</button>
-    </div>
-    ${routines.length
-      ? `<ul class="wk-routines">${routines.map(routineCard).join('')}</ul>`
-      : '<p class="muted small-print">Save the workouts you repeat (e.g. Push, Pull, Legs) and start them in one tap.</p>'}
-
-    <h2 class="section-title">Last 7 days</h2>
-    <div class="stats stats-3">
-      <div class="stat"><strong>${week.length}</strong><span>Workouts</span></div>
-      <div class="stat"><strong>${weekTime ? durationText(weekTime) : '0 min'}</strong><span>Time</span></div>
-      <div class="stat"><strong>${shortVolume(week.reduce((v, w) => v + volumeOf(w.exercises), 0))}</strong><span>Volume</span></div>
-    </div>`;
-
-  el.onclick = (ev) => {
-    const b = ev.target.closest('button');
-    if (!b) return;
-    if ('resume' in b.dataset) openLog();
-    else if ('empty' in b.dataset) startWorkout();
-    else if ('newRoutine' in b.dataset) navigate('fitness/routine/new');
-    else if (b.dataset.edit) navigate(`fitness/routine/${b.dataset.edit}`);
-    else if (b.dataset.start) {
-      const r = getRoutines().find((x) => x.id === b.dataset.start);
-      if (r) startWorkout(r);
-    }
-  };
-}
-
-// ===================== Routine: δημιουργία / αλλαγή =====================
-
-let draft = null; // το routine που επεξεργάζεσαι: { key, isNew, id, name, exercises }
-
-function renderRoutine(el, id) {
-  // Νέο πρόχειρο μόνο όταν ανοίγεις άλλο routine (όχι σε κάθε ξαναζωγράφισμα)
-  if (!draft || draft.key !== id) {
-    const found = getRoutines().find((r) => r.id === id);
-    draft = found
-      ? { ...JSON.parse(JSON.stringify(found)), key: id, isNew: false }
-      : { key: id, isNew: true, id: uid(), name: '', exercises: [] };
-  }
-  el.innerHTML = `
-    <label class="field"><span>Routine name</span>
-      <input class="wk-routine-name" value="${escapeHtml(draft.name)}" placeholder="e.g. Push day" maxlength="40"></label>
-    <ul class="list wk-routine-list">
-      ${draft.exercises.map((e, i) => `
-        <li><div class="row row-static">
-          <span class="row-text"><span class="row-title">${escapeHtml(exTitle(exById(e.exerciseId)))}</span>
-            <span class="row-sub">${e.sets} ${e.sets === 1 ? 'set' : 'sets'}</span></span>
-          <span class="wk-stepper">
-            <button class="icon-btn" data-sets="${i}:-1" aria-label="Fewer sets">−</button>
-            <button class="icon-btn" data-sets="${i}:1" aria-label="More sets">+</button>
-          </span>
-          <button class="wk-icon-btn" data-remove="${i}" aria-label="Remove exercise">×</button>
-        </div></li>`).join('') || '<li class="wk-none muted">No exercises yet.</li>'}
-    </ul>
-    <button class="btn btn-quiet btn-block" data-add>${icon(ICONS.plus)} Add exercises</button>
-    <div class="stack">
-      <button class="btn btn-block" data-save>Save routine</button>
-      ${draft.isNew ? '' : '<button class="btn btn-danger btn-block" data-delete>Delete routine</button>'}
-    </div>`;
-
-  el.querySelector('.wk-routine-name').addEventListener('input', (ev) => { draft.name = ev.target.value; });
-  el.onclick = async (ev) => {
-    const b = ev.target.closest('button');
-    if (!b) return;
-    if (b.dataset.sets) {
-      const [i, d] = b.dataset.sets.split(':').map(Number);
-      draft.exercises[i].sets = Math.min(10, Math.max(1, draft.exercises[i].sets + d));
-      renderRoutine(el, id);
-    } else if (b.dataset.remove) {
-      draft.exercises.splice(Number(b.dataset.remove), 1);
-      renderRoutine(el, id);
-    } else if ('add' in b.dataset) {
-      pickExercises((ids) => {
-        ids.forEach((exerciseId) => draft.exercises.push({ exerciseId, sets: DEFAULT_SETS, rest: DEFAULT_REST }));
-        renderRoutine(el, id);
-      });
-    } else if ('save' in b.dataset) {
-      if (!draft.name.trim()) { toast('Give the routine a name'); return; }
-      if (!draft.exercises.length) { toast('Add at least one exercise'); return; }
-      const { isNew, key, ...clean } = draft;
-      clean.name = clean.name.trim();
-      store.update('routines', (list) => (isNew ? [...list, clean] : list.map((r) => (r.id === clean.id ? clean : r))), []);
-      draft = null;
-      toast('Routine saved');
-      navigate('fitness');
-    } else if ('delete' in b.dataset) {
-      const yes = await ask({ title: 'Delete routine?', text: `"${draft.name}" will be deleted. Your past workouts stay in History.`, confirmLabel: 'Delete' });
-      if (!yes) return;
-      store.update('routines', (list) => list.filter((r) => r.id !== draft.id), []);
-      draft = null;
-      toast('Routine deleted');
-      navigate('fitness');
-    }
-  };
-}
-
-// ===================== Καρτέλα History =====================
-
-const dayText = (ts) => new Date(ts).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-
-function workoutCard(w) {
-  return `
-    <li><button class="wk-hist" data-open="${w.id}">
-      <span class="wk-hist-top"><strong>${escapeHtml(w.name)}</strong><span class="muted">${dayText(w.startedAt)}</span></span>
-      <span class="wk-hist-stats">
-        <span>${icon(ICONS.timer)} ${durationText(w.endedAt - w.startedAt)}</span>
-        <span>${fmtVolume(volumeOf(w.exercises))}</span>
-        <span>${setsCount(w.exercises)} sets</span>
-      </span>
-      <span class="wk-hist-ex">${w.exercises.map((e) => `
-        <span><span class="muted">${e.sets.length} ×</span> ${escapeHtml(exTitle(exById(e.exerciseId)))}<span class="muted wk-best">${setText(bestSet(e.sets))}</span></span>`).join('')}
-      </span>
-    </button></li>`;
-}
-
-function renderHistory(el, params) {
-  if (params[0]) { renderWorkout(el, params[0]); return; }
-  const hist = getHistory().slice().reverse();
-  el.innerHTML = hist.length
-    ? `<ul class="wk-hist-list">${hist.map(workoutCard).join('')}</ul>`
-    : `<div class="section-empty"><span class="section-empty-icon">${icon(ICONS.history)}</span>
-        <p class="muted">Your finished workouts will show up here.</p></div>`;
-  el.onclick = (ev) => {
-    const b = ev.target.closest('[data-open]');
-    if (b) navigate(`workouts/${b.dataset.open}`);
-  };
-}
-
-function renderWorkout(el, id) {
-  const w = getHistory().find((x) => x.id === id);
-  if (!w) { el.innerHTML = '<p class="muted">This workout no longer exists.</p>'; return; }
-  el.innerHTML = `
-    <p class="subhead">${dayText(w.startedAt)}</p>
-    <h2 class="section-title first">${escapeHtml(w.name)}</h2>
-    <div class="stats stats-3">
-      <div class="stat"><strong>${durationText(w.endedAt - w.startedAt)}</strong><span>Duration</span></div>
-      <div class="stat"><strong>${fmtVolume(volumeOf(w.exercises)).replace(' kg', '')}</strong><span>Volume (kg)</span></div>
-      <div class="stat"><strong>${setsCount(w.exercises)}</strong><span>Sets</span></div>
-    </div>
-    ${w.exercises.map((e) => {
-      let n = 0;
-      return `
-      <h2 class="section-title">${escapeHtml(exTitle(exById(e.exerciseId)))}</h2>
-      <ul class="list compact-list">${e.sets.map((s) => {
-        const label = SET_TYPES[s.type]?.short || String(++n);
-        return `<li><div class="row row-compact row-static">
-          <span class="wk-type t-${s.type}">${label}</span>
-          <span class="row-title">${setText(s)}</span>
-        </div></li>`;
-      }).join('')}</ul>`;
-    }).join('')}
-    <div class="stack">
-      <button class="btn btn-quiet btn-block" data-routine>Save as routine</button>
-      <button class="btn btn-danger btn-block" data-delete>Delete workout</button>
-    </div>`;
-  el.onclick = async (ev) => {
-    const b = ev.target.closest('button');
-    if (!b) return;
-    if ('routine' in b.dataset) {
-      const r = { id: uid(), name: w.name, exercises: w.exercises.map((e) => ({ exerciseId: e.exerciseId, sets: e.sets.length, rest: DEFAULT_REST })) };
-      store.update('routines', (list) => [...list, r], []);
-      toast('Saved as routine');
-    } else if ('delete' in b.dataset) {
-      const yes = await ask({ title: 'Delete workout?', text: 'It will be removed from your history.', confirmLabel: 'Delete' });
-      if (!yes) return;
-      store.update('history', (list) => list.filter((x) => x.id !== w.id), []);
-      toast('Workout deleted');
-      navigate('workouts');
-    }
-  };
-}
-
-// ===================== Καταχώρηση =====================
-
-register({
-  id: 'fitness',
-  title: 'Workout',
-  icon: ICONS.dumbbell,
-  order: 80,
-  section: 'fitness',
-  sectionHome: true, // η πρώτη καρτέλα του Fitness
-  home: false,
-  render(el, params = []) {
-    if (params[0] === 'routine' && params[1]) renderRoutine(el, params[1]);
-    else renderHome(el);
-  },
-  unmount() { draft = null; },
-});
-
-register({
-  id: 'workouts',
-  title: 'History',
-  icon: ICONS.history,
-  order: 81,
-  section: 'fitness',
-  nav: true, // καρτέλα στην κάτω μπάρα του Fitness
-  home: false,
-  render: renderHistory,
-});
+export {
+  ICONS, SET_TYPES, DEFAULT_REST, DEFAULT_SETS,
+  uid, allExercises, exById, exTitle, fmtKg, fmtVolume, durationText, volumeOf, setsCount,
+  bestSet, setText, getHistory, getRoutines, getActive, startWorkout, openLog, pickExercises,
+};
 
 // Αν το app άνοιξε με προπόνηση σε εξέλιξη: το κουμπί "Workout 12:34" για να γυρίσεις
 updatePill();
