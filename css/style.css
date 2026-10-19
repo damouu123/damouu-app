@@ -2428,74 +2428,157 @@ button.ft-range .icon { width: 18px; height: 18px; }
 button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: none; font: inherit; font-size: 15px; cursor: pointer; }
 .ft-more { margin-top: 12px; }
 
+
 /* =====================================================================
-   Calories (js/modules/calories.js): πρόοδος, νερό, γεύματα
+   Calories (js/modules/calories.js): διάταξη από το "Nutrition tracking"
+   (εβδομάδα, κύκλος KCAL LEFT, μακρο, Daily, κουμπί +) στα χρώματα του app
    ===================================================================== */
-/* Κάρτα προόδου: μπλε, όπως η κάρτα του μυαλού */
-.cl-progress {
-  position: relative;
-  overflow: hidden;
-  isolation: isolate;
-  margin-top: 4px;
-  padding: 18px 18px 14px;
-  border-radius: 26px;
-  background: linear-gradient(140deg, #2B90E4 0%, #1B70CA 55%, #1559B0 100%);
-  color: #fff;
-  box-shadow: 0 16px 34px rgba(27, 112, 202, 0.32);
+/* Πάνω μέρος: απαλό γαλάζιο "κομμάτι" με καμπύλη στο κάτω μέρος */
+.cl-hero {
+  margin: 0 -20px;
+  padding: 4px 20px 22px;
+  background: linear-gradient(180deg, rgba(90, 180, 240, 0.28) 0%, rgba(31, 127, 214, 0.16) 100%);
+  border-radius: 0 0 44px 44px;
 }
-.cl-progress::before { content: ""; position: absolute; z-index: -1; width: 240px; height: 240px; right: -90px; top: -120px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 50%; }
-.cl-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.cl-progress-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
-.cl-badge { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
-.cl-badge .icon { width: 17px; height: 17px; }
-.cl-day { display: flex; align-items: center; gap: 2px; }
-.cl-day-btn, .cl-day-label { border: none; background: none; color: #fff; font: inherit; cursor: pointer; }
-.cl-day-btn { width: 30px; height: 30px; font-size: 22px; line-height: 1; border-radius: 10px; }
-.cl-day-btn:disabled { opacity: 0.3; cursor: default; }
-.cl-day-label { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.16); font-size: 14px; font-weight: 600; }
-.cl-day-label .icon { width: 15px; height: 15px; }
-.cl-kcal { margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
-.cl-kcal strong { font-size: 30px; font-weight: 750; }
-.cl-kcal span { font-size: 16px; opacity: 0.85; }
-.cl-bar { display: block; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.24); overflow: hidden; }
-.cl-bar i { display: block; height: 100%; border-radius: inherit; background: #fff; transition: width 0.6s var(--ease); }
-.cl-bar.over i { background: #FFD1D9; }
-.cl-left { margin: 6px 0 12px; font-size: 14px; opacity: 0.85; }
-.cl-macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.cl-macro { display: grid; gap: 6px; padding: 10px; border-radius: 16px; background: rgba(255, 255, 255, 0.92); color: var(--text); }
-.cl-macro-label { font-size: 13px; color: var(--muted); }
-.cl-bar.small { height: 6px; background: rgba(20, 42, 110, 0.08); }
-.cl-bar.small i { background: var(--mc); }
-.cl-macro-val { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.cl-goals-btn { display: block; margin: 10px auto 0; padding: 4px 8px; border: none; background: none; color: #fff; font: inherit; font-size: 14px; font-weight: 600; opacity: 0.9; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.cl-week { display: flex; align-items: center; gap: 2px; }
+.cl-wk-nav { flex: none; width: 26px; height: 44px; padding: 0; border: none; background: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+.cl-wk-nav:disabled { opacity: 0.25; cursor: default; }
+.cl-days { flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cl-wd {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 6px 0 10px;
+  border: none;
+  border-radius: 14px;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.25s, color 0.25s, transform 0.3s var(--spring);
+}
+.cl-wd span { font-size: 12px; font-weight: 600; }
+.cl-wd strong { font-size: 16px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.cl-wd:active { transform: scale(0.9); }
+.cl-wd:disabled { opacity: 0.35; cursor: default; }
+.cl-wd.sel { background: rgba(255, 255, 255, 0.85); color: var(--text); box-shadow: 0 6px 16px rgba(31, 84, 160, 0.12); }
+.cl-wd.sel strong { font-weight: 800; }
+.cl-wd.today::after { content: ""; position: absolute; bottom: 3px; width: 5px; height: 5px; border-radius: 50%; background: #F28C28; }
+
+/* Κύκλος: Eaten | KCAL LEFT | Burned */
+.cl-ring-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; margin-top: 14px; }
+.cl-side { display: grid; justify-items: center; gap: 2px; }
+.cl-side strong { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cl-side span:last-child { font-size: 12px; font-weight: 650; letter-spacing: 0.04em; color: var(--muted); text-transform: uppercase; }
+.cl-side-icon { color: #F28C28; }
+.cl-side-icon.burn { color: #E8566C; }
+.cl-side-icon .icon { width: 22px; height: 22px; }
+.cl-ring { position: relative; width: min(46vw, 184px); aspect-ratio: 1; }
+.cl-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+.cl-ring-track, .cl-ring-bar { fill: none; stroke-width: 15; }
+.cl-ring-track { stroke: rgba(255, 255, 255, 0.75); }
+.cl-ring-bar {
+  stroke: var(--blue);
+  stroke-linecap: round;
+  stroke-dashoffset: var(--off);
+  animation: ring-fill 1s var(--ease) backwards;
+  transition: stroke-dashoffset 0.6s var(--ease);
+}
+.cl-ring-bar.over { stroke: #E8566C; }
+@keyframes ring-fill { from { stroke-dashoffset: 440; } }
+.cl-ring-mid {
+  position: absolute;
+  inset: 22px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(31, 84, 160, 0.16);
+}
+.cl-ring-icon { color: #F28C28; }
+.cl-ring-icon .icon { width: 22px; height: 22px; fill: currentColor; }
+.cl-ring-mid strong { font: 750 32px var(--display); line-height: 1.05; font-variant-numeric: tabular-nums; }
+.cl-ring-mid span:last-child { font-size: 11px; font-weight: 650; letter-spacing: 0.06em; color: var(--muted); }
+
+/* Μακρο: μικρή μπάρα, όνομα, "150g left" */
+.cl-macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; text-align: center; }
+.cl-macro { display: grid; justify-items: center; gap: 4px; }
+.cl-macro-bar { width: 60%; height: 4px; border-radius: 999px; background: rgba(255, 255, 255, 0.8); overflow: hidden; }
+.cl-macro-bar i { display: block; height: 100%; border-radius: inherit; background: var(--mc); transition: width 0.6s var(--ease); }
+.cl-macro-label { font-size: 11px; font-weight: 650; letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
+.cl-macro strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.cl-goals-btn { display: block; margin: 12px auto 0; padding: 4px 10px; border: none; border-radius: 10px; background: rgba(255, 255, 255, 0.6); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+/* Daily: μία κάρτα ανά γεύμα, με εικόνα δεξιά */
+.cl-daily { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.cl-meal-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 14px 14px 18px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.3s var(--spring);
+  animation: rise 0.45s var(--ease) backwards;
+}
+.cl-daily li:nth-child(2) .cl-meal-card { animation-delay: 40ms; }
+.cl-daily li:nth-child(3) .cl-meal-card { animation-delay: 80ms; }
+.cl-daily li:nth-child(4) .cl-meal-card { animation-delay: 120ms; }
+.cl-meal-card:active { transform: scale(0.98); }
+.cl-meal-text { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.cl-meal-name { font-size: 15px; font-weight: 700; color: var(--meal); }
+.cl-meal-foods { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; }
+.cl-meal-kcal { margin-top: 6px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cl-meal-kcal strong { font-size: 20px; color: var(--text); }
+.cl-meal-pic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--meal) 14%, #fff);
+  font-size: 42px;
+  line-height: 1;
+}
+.cl-meal-pic.empty { filter: grayscale(0.4); opacity: 0.75; }
 
 /* Νερό */
 .cl-card {
-  margin-top: 16px;
-  padding: 16px;
+  margin-top: 14px;
+  padding: 14px 16px;
   background: var(--surface);
   border: 1px solid var(--glass-edge);
-  border-radius: 24px;
+  border-radius: 22px;
   box-shadow: var(--shadow);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
 }
-.cl-card-title { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
 .cl-water-row { display: flex; align-items: center; gap: 12px; }
-.cl-glass { position: relative; flex: none; display: grid; place-items: center; width: 48px; height: 56px; border-radius: 14px; background: rgba(90, 180, 240, 0.14); color: var(--blue); overflow: hidden; }
-.cl-glass .icon { position: relative; z-index: 1; width: 28px; height: 28px; }
+.cl-glass { position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 52px; border-radius: 14px; background: rgba(90, 180, 240, 0.14); color: var(--blue); overflow: hidden; }
+.cl-glass .icon { position: relative; z-index: 1; width: 26px; height: 26px; }
 .cl-glass i { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(90, 180, 240, 0.45); transition: height 0.6s var(--spring); }
 .cl-water-text { flex: 1; display: grid; min-width: 0; }
-.cl-water-text strong { font-size: 20px; font-variant-numeric: tabular-nums; }
-.cl-water-text strong span { font-size: 15px; font-weight: 500; color: var(--muted); }
+.cl-water-text strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cl-water-text strong span { font-size: 14px; font-weight: 500; color: var(--muted); }
 .cl-water-text .muted { font-size: 13px; }
 .cl-stepper { display: flex; align-items: center; gap: 8px; }
-.cl-glasses { min-width: 26px; text-align: center; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
 .cl-round {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   border: 1.5px solid var(--line-strong);
   border-radius: 50%;
@@ -2508,45 +2591,53 @@ button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: n
 .cl-round:active { transform: scale(0.85); }
 .cl-round:disabled { opacity: 0.4; cursor: default; }
 .cl-round.filled { background: var(--blue); border-color: var(--blue); color: #fff; }
+.cl-source { margin: 14px 0 70px; text-align: center; }
 
-/* Γεύματα: πλέγμα 2 × 2 */
-.cl-meals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.cl-meal {
+/* Κεντρικό κουμπί "+" πάνω από την κάτω μπάρα */
+.cl-fab {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + var(--safe-bottom) + 14px);
+  z-index: 12;
   display: grid;
-  gap: 12px;
-  padding: 14px;
-  background: var(--surface);
-  border: 1px solid var(--glass-edge);
-  border-radius: 22px;
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  margin-left: -30px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(140deg, #F6A04D, #EE7A1F);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(238, 122, 31, 0.45);
+  cursor: pointer;
+  transition: transform 0.35s var(--spring);
+  animation: emoji-pop 0.6s var(--spring) backwards;
 }
-.cl-meal-main { display: grid; gap: 4px; padding: 0; border: none; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
-.cl-meal-main strong { font-size: 18px; }
-.cl-meal-rec { display: flex; align-items: flex-start; gap: 4px; font-size: 12px; color: var(--muted); line-height: 1.3; }
-.cl-meal-rec .icon { flex: none; width: 15px; height: 15px; color: #E0882B; }
-.cl-meal-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.cl-meal-foods { display: flex; }
-.cl-food-dot { display: grid; place-items: center; width: 34px; height: 34px; margin-right: -8px; border: 2px solid #fff; border-radius: 50%; background: #FCE8C8; color: #A55B12; font-size: 14px; font-weight: 750; }
-.cl-food-dot:nth-child(2) { background: #DDEFDF; color: #17955A; }
-.cl-food-dot:nth-child(3) { background: #DCEBFA; color: var(--blue); }
-.cl-food-dot.more { background: var(--navy); color: #fff; font-size: 12px; }
-.cl-source { margin-top: 16px; text-align: center; }
+.cl-fab .icon { width: 28px; height: 28px; stroke-width: 2.4; }
+.cl-fab:active { transform: scale(0.88) rotate(90deg); }
 
-/* Φύλλα: αναζήτηση και γραμμάρια */
+/* Φύλλα: επιλογή γεύματος, αναζήτηση, γραμμάρια */
+.cl-meal-pick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.cl-meal-opt { display: grid; justify-items: center; gap: 4px; padding: 14px 8px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--text); font: inherit; font-weight: 650; cursor: pointer; transition: transform 0.3s var(--spring); }
+.cl-meal-opt span { font-size: 30px; }
+.cl-meal-opt.sel { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.cl-meal-opt:active { transform: scale(0.95); }
 .cl-sheet { display: flex; flex-direction: column; }
 .cl-search { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .cl-search .icon { width: 20px; height: 20px; color: var(--muted); }
 .cl-search input { flex: 1; min-height: 46px; border: none; background: none; color: var(--text); font: inherit; font-size: 16px; outline: none; }
-.cl-results { max-height: 52vh; overflow-y: auto; margin-top: 10px; }
-.cl-results-head { padding: 10px 16px 4px; list-style: none; font-size: 13px; }
-.cl-result { min-height: 60px; }
-.cl-result-name { font-size: 15px; line-height: 1.3; }
-.cl-result-name .muted { font-weight: 400; }
-.cl-food-title { font-size: 20px !important; line-height: 1.3; }
-.cl-food-title .muted { font-size: 15px; font-weight: 400; }
-.cl-grams { display: grid; gap: 10px; margin-top: 12px; }
+.cl-cats { flex-wrap: nowrap; overflow-x: auto; margin-top: 10px; padding-bottom: 4px; scrollbar-width: none; }
+.cl-cats::-webkit-scrollbar { display: none; }
+.cl-cats .chip { flex: none; min-height: 36px; }
+.cl-cats[hidden] { display: none; }
+.cl-results { max-height: 46vh; overflow-y: auto; margin-top: 10px; }
+.cl-result { min-height: 58px; }
+.cl-result-emoji { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: rgba(255, 255, 255, 0.1); font-size: 22px; }
+.cl-more { margin-top: 8px; }
+.cl-food-head { display: flex; align-items: center; gap: 12px; }
+.cl-food-head h2 { margin: 0; font-size: 21px; line-height: 1.25; }
+.cl-food-emoji { flex: none; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; background: rgba(255, 255, 255, 0.12); font-size: 32px; }
+.cl-grams { display: grid; gap: 10px; margin-top: 14px; }
 .cl-grams-field { display: flex; align-items: baseline; gap: 6px; }
 .cl-grams-field input { width: 120px; min-height: 52px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); font: 700 26px var(--display); text-align: center; }
 .cl-grams-field span { font-size: 18px; color: var(--muted); }
