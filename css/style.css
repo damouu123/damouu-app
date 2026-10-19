@@ -2427,3 +2427,131 @@ button.ft-range .icon { width: 18px; height: 18px; }
 .ft-hist-card .ft-hist-sets { margin-top: 2px; animation: rise 0.35s var(--ease) backwards; }
 button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: none; font: inherit; font-size: 15px; cursor: pointer; }
 .ft-more { margin-top: 12px; }
+
+/* =====================================================================
+   Calories (js/modules/calories.js): πρόοδος, νερό, γεύματα
+   ===================================================================== */
+/* Κάρτα προόδου: μπλε, όπως η κάρτα του μυαλού */
+.cl-progress {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  margin-top: 4px;
+  padding: 18px 18px 14px;
+  border-radius: 26px;
+  background: linear-gradient(140deg, #2B90E4 0%, #1B70CA 55%, #1559B0 100%);
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(27, 112, 202, 0.32);
+}
+.cl-progress::before { content: ""; position: absolute; z-index: -1; width: 240px; height: 240px; right: -90px; top: -120px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 50%; }
+.cl-progress-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cl-progress-title { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+.cl-badge { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
+.cl-badge .icon { width: 17px; height: 17px; }
+.cl-day { display: flex; align-items: center; gap: 2px; }
+.cl-day-btn, .cl-day-label { border: none; background: none; color: #fff; font: inherit; cursor: pointer; }
+.cl-day-btn { width: 30px; height: 30px; font-size: 22px; line-height: 1; border-radius: 10px; }
+.cl-day-btn:disabled { opacity: 0.3; cursor: default; }
+.cl-day-label { display: flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 10px; background: rgba(255, 255, 255, 0.16); font-size: 14px; font-weight: 600; }
+.cl-day-label .icon { width: 15px; height: 15px; }
+.cl-kcal { margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+.cl-kcal strong { font-size: 30px; font-weight: 750; }
+.cl-kcal span { font-size: 16px; opacity: 0.85; }
+.cl-bar { display: block; height: 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.24); overflow: hidden; }
+.cl-bar i { display: block; height: 100%; border-radius: inherit; background: #fff; transition: width 0.6s var(--ease); }
+.cl-bar.over i { background: #FFD1D9; }
+.cl-left { margin: 6px 0 12px; font-size: 14px; opacity: 0.85; }
+.cl-macros { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cl-macro { display: grid; gap: 6px; padding: 10px; border-radius: 16px; background: rgba(255, 255, 255, 0.92); color: var(--text); }
+.cl-macro-label { font-size: 13px; color: var(--muted); }
+.cl-bar.small { height: 6px; background: rgba(20, 42, 110, 0.08); }
+.cl-bar.small i { background: var(--mc); }
+.cl-macro-val { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.cl-goals-btn { display: block; margin: 10px auto 0; padding: 4px 8px; border: none; background: none; color: #fff; font: inherit; font-size: 14px; font-weight: 600; opacity: 0.9; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+
+/* Νερό */
+.cl-card {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.cl-card-title { margin: 0 0 12px; font-size: 18px; font-weight: 700; }
+.cl-water-row { display: flex; align-items: center; gap: 12px; }
+.cl-glass { position: relative; flex: none; display: grid; place-items: center; width: 48px; height: 56px; border-radius: 14px; background: rgba(90, 180, 240, 0.14); color: var(--blue); overflow: hidden; }
+.cl-glass .icon { position: relative; z-index: 1; width: 28px; height: 28px; }
+.cl-glass i { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(90, 180, 240, 0.45); transition: height 0.6s var(--spring); }
+.cl-water-text { flex: 1; display: grid; min-width: 0; }
+.cl-water-text strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.cl-water-text strong span { font-size: 15px; font-weight: 500; color: var(--muted); }
+.cl-water-text .muted { font-size: 13px; }
+.cl-stepper { display: flex; align-items: center; gap: 8px; }
+.cl-glasses { min-width: 26px; text-align: center; font-weight: 700; font-size: 18px; font-variant-numeric: tabular-nums; }
+.cl-round {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  transition: transform 0.3s var(--spring);
+}
+.cl-round .icon { width: 18px; height: 18px; stroke-width: 2.2; }
+.cl-round:active { transform: scale(0.85); }
+.cl-round:disabled { opacity: 0.4; cursor: default; }
+.cl-round.filled { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+/* Γεύματα: πλέγμα 2 × 2 */
+.cl-meals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.cl-meal {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+}
+.cl-meal-main { display: grid; gap: 4px; padding: 0; border: none; background: none; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.cl-meal-main strong { font-size: 18px; }
+.cl-meal-rec { display: flex; align-items: flex-start; gap: 4px; font-size: 12px; color: var(--muted); line-height: 1.3; }
+.cl-meal-rec .icon { flex: none; width: 15px; height: 15px; color: #E0882B; }
+.cl-meal-foot { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.cl-meal-foods { display: flex; }
+.cl-food-dot { display: grid; place-items: center; width: 34px; height: 34px; margin-right: -8px; border: 2px solid #fff; border-radius: 50%; background: #FCE8C8; color: #A55B12; font-size: 14px; font-weight: 750; }
+.cl-food-dot:nth-child(2) { background: #DDEFDF; color: #17955A; }
+.cl-food-dot:nth-child(3) { background: #DCEBFA; color: var(--blue); }
+.cl-food-dot.more { background: var(--navy); color: #fff; font-size: 12px; }
+.cl-source { margin-top: 16px; text-align: center; }
+
+/* Φύλλα: αναζήτηση και γραμμάρια */
+.cl-sheet { display: flex; flex-direction: column; }
+.cl-search { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.cl-search .icon { width: 20px; height: 20px; color: var(--muted); }
+.cl-search input { flex: 1; min-height: 46px; border: none; background: none; color: var(--text); font: inherit; font-size: 16px; outline: none; }
+.cl-results { max-height: 52vh; overflow-y: auto; margin-top: 10px; }
+.cl-results-head { padding: 10px 16px 4px; list-style: none; font-size: 13px; }
+.cl-result { min-height: 60px; }
+.cl-result-name { font-size: 15px; line-height: 1.3; }
+.cl-result-name .muted { font-weight: 400; }
+.cl-food-title { font-size: 20px !important; line-height: 1.3; }
+.cl-food-title .muted { font-size: 15px; font-weight: 400; }
+.cl-grams { display: grid; gap: 10px; margin-top: 12px; }
+.cl-grams-field { display: flex; align-items: baseline; gap: 6px; }
+.cl-grams-field input { width: 120px; min-height: 52px; padding: 0 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); font: 700 26px var(--display); text-align: center; }
+.cl-grams-field span { font-size: 18px; color: var(--muted); }
+.cl-grams .chips { margin-top: 0; }
+.cl-preview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+.cl-preview div { display: grid; padding: 10px 4px; border-radius: 14px; background: var(--surface); text-align: center; }
+.cl-preview strong { font-size: 17px; }
+.cl-preview span { font-size: 12px; color: var(--muted); }
