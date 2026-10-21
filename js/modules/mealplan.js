@@ -60,9 +60,12 @@ function qtyText(item, q) {
   if (q === undefined || q === null) return '—';
   const v = Math.max(0, q);
   if (item.unit === 'g') return v >= 1000 ? `${String(Math.round(v / 100) / 10).replace('.', ',')} kg` : `${Math.round(v)} g`;
+  if (item.per) return countText(item, v);
   return `${String(Math.round(v * 10) / 10).replace('.', ',')} τεμ.`;
 }
-const amountText = (item, q) => (item.unit === 'g' ? `${q} g` : `×${String(q).replace('.', ',')}`);
+// Λαϊκή: "1 πατάτα", "7 πατάτες"
+const countText = (item, n) => { const r = Math.round(n * 10) / 10; return `${String(r).replace('.', ',')} ${r === 1 ? item.per[0] : item.per[1]}`; };
+const amountText = (item, q) => (item.unit === 'g' ? `${q} g` : item.per ? countText(item, q) : `×${String(q).replace('.', ',')}`);
 
 // Πόσο χρησιμοποιεί το πρόγραμμα από κάθε υλικό την εβδομάδα (με την πρώτη επιλογή όπου έχει "ή")
 const WEEKLY = (() => {
@@ -154,6 +157,7 @@ function renderPlan(el) {
 // ===================== Groceries =====================
 
 function stockSheet(item, after) {
+  if (item.per) { laikiSheet(item, after); return; }
   const stock = getStock();
   const cur = stock[item.id];
   const step = item.unit === 'g' ? (item.pack.size >= 1000 ? 100 : 50) : 1;
@@ -289,6 +293,75 @@ function stockSheet(item, after) {
   });
 }
 
+// Λαϊκή: "πήγα στη λαϊκή και πήρα 7 πατάτες" ή "2 κιλά πατάτες".
+// Κομμάτια: −/+ από 1 έως 20. Κιλά: 0,5 έως 5 kg, μετατρέπονται σε κομμάτια με το μέσο βάρος.
+function laikiSheet(item, after) {
+  const have = getStock()[item.id];
+  let mode = 'pcs';
+  let pcs = 1;
+  let kg = 1;
+  const KG_STEP = 0.5;
+  const fromKg = () => Math.max(1, Math.round((kg * 1000) / item.gEach));
+  const amount = () => (mode === 'kg' ? fromKg() : pcs);
+  openSheet(`
+    <h2>${escapeHtml(item.name)}</h2>
+    <p class="muted">${storeById(item.store).emoji} ${storeById(item.store).name}${WEEKLY[item.id] ? ` · the plan uses ${countText(item, WEEKLY[item.id])} a week` : ''}</p>
+    <p class="mp-have">You have now: <strong>${have === undefined ? 'not set' : countText(item, have)}</strong></p>
+    ${item.gEach ? `
+      <div class="segmented mp-mode" role="radiogroup" aria-label="Count by">
+        <label><input type="radio" name="mpmode" value="pcs" checked><span>${item.per[1][0].toUpperCase() + item.per[1].slice(1)}</span></label>
+        <label><input type="radio" name="mpmode" value="kg"><span>Κιλά</span></label>
+      </div>` : ''}
+    <div class="mp-amount">
+      <button class="mp-round" data-amt="-1" aria-label="Less">−</button>
+      <span class="mp-amount-val" aria-live="polite"></span>
+      <button class="mp-round" data-amt="1" aria-label="More">+</button>
+    </div>
+    <p class="muted small-print mp-amount-note"></p>
+    <div class="stack">
+      <button class="btn btn-block" data-add></button>
+      <button class="btn btn-quiet btn-block" data-set></button>
+      <button class="link-btn centered" data-zero>Ran out (0)</button>
+    </div>`,
+  (root, close) => {
+    const val = root.querySelector('.mp-amount-val');
+    const note = root.querySelector('.mp-amount-note');
+    const paint = () => {
+      const n = amount();
+      val.textContent = mode === 'kg' ? `${String(kg).replace('.', ',')} kg` : countText(item, pcs);
+      note.textContent = mode === 'kg' ? `≈ ${countText(item, n)} (about ${item.gEach} g each)` : '';
+      root.querySelector('[data-amt="-1"]').disabled = mode === 'kg' ? kg <= KG_STEP : pcs <= 1;
+      root.querySelector('[data-amt="1"]').disabled = mode === 'kg' ? kg >= 5 : pcs >= 20;
+      root.querySelector('[data-add]').textContent = `I bought ${countText(item, n)}`;
+      root.querySelector('[data-set]').textContent = `I have ${countText(item, n)} in total`;
+    };
+    paint();
+    root.addEventListener('change', (ev) => { if (ev.target.name === 'mpmode') { mode = ev.target.value; paint(); } });
+    const save = (value, message) => {
+      const s = getStock();
+      s[item.id] = value;
+      store.set('stock', s);
+      notifyLow();
+      haptic();
+      toast(message);
+      close();
+      after();
+    };
+    root.addEventListener('click', (ev) => {
+      const b = ev.target.closest('button');
+      if (!b || b.disabled) return;
+      if (b.dataset.amt) {
+        const d = Number(b.dataset.amt);
+        if (mode === 'kg') kg = Math.min(5, Math.max(KG_STEP, kg + d * KG_STEP)); else pcs = Math.min(20, Math.max(1, pcs + d));
+        haptic();
+        paint();
+      } else if ('add' in b.dataset) save((getStock()[item.id] || 0) + amount(), `+${countText(item, amount())}`);
+      else if ('set' in b.dataset) save(amount(), `${item.name}: ${countText(item, amount())}`);
+      else if ('zero' in b.dataset) save(0, `${item.name}: ran out`);
+    });
+  });
+}
+
 // "Τα πήρα": προσθέτει ένα πακέτο (ή όσα λέει το πρόγραμμα, π.χ. στήθος ×2) σε όσα λείπουν από ένα μαγαζί
 function boughtSheet(storeId, after) {
   const s = storeById(storeId);
@@ -372,7 +445,7 @@ function renderGroceries(el) {
 
 let trackDay = null;
 
-const usesText = (uses) => uses.map(([id, q]) => `${itemById(id).name} ${amountText(itemById(id), q)}`).join(', ');
+const usesText = (uses) => uses.map(([id, q]) => (itemById(id).per ? countText(itemById(id), q) : `${itemById(id).name} ${amountText(itemById(id), q)}`)).join(', ');
 
 function setTrack(key, mealId, value) {
   const all = getTrack();
@@ -440,7 +513,7 @@ function adjustSheet(mealId, choiceIdx, uses, after) {
       const it = itemById(id);
       return `
       <li><div class="row row-static">
-        <span class="row-text"><span class="row-title">${escapeHtml(it.name)}</span><span class="row-sub">${it.unit === 'g' ? 'grams' : 'pieces'}</span></span>
+        <span class="row-text"><span class="row-title">${escapeHtml(it.name)}</span><span class="row-sub">${it.unit === 'g' ? 'grams' : it.per ? it.per[1] : 'pieces'}</span></span>
         ${qtyControl(it, q)}
       </div></li>`;
     }).join('')}</ul>
@@ -533,7 +606,7 @@ function renderTrack(el) {
       </li>`;
     }).join('')}</ul>
 
-    ${tracked.extra && tracked.extra.length ? `<p class="muted small-print">Also used: ${tracked.extra.map((x) => `${escapeHtml(itemById(x.id).name)} ${amountText(itemById(x.id), x.q)}`).join(', ')}</p>` : ''}
+    ${tracked.extra && tracked.extra.length ? `<p class="muted small-print">Also used: ${escapeHtml(usesText(tracked.extra.map((x) => [x.id, x.q])))}</p>` : ''}
     <button class="btn btn-quiet btn-block mp-extra" data-extra>${icon(ICONS.plus)} Used something else</button>`;
 
   const again = () => renderTrack(el);

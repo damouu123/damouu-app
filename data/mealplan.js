@@ -2,6 +2,8 @@
 //
 // ITEMS: τα ψώνια, ανά μαγαζί. unit: 'g' (γραμμάρια) ή 'pcs' (τεμάχια).
 //   pack: πόσα παίρνεις κάθε φορά που ψωνίζεις (και η τιμή, όπου την ξέρουμε).
+//   Λαϊκή: per = [ένα, πολλά] ("1 πατάτα", "7 πατάτες"), gEach = μέσο βάρος ενός σε g,
+//   ώστε να γράφεις και κιλά (1 kg πατάτες ≈ 6 πατάτες).
 // PLAN: για κάθε μέρα (0 = Δευτέρα) τα 4 γεύματα. uses = [υλικό, ποσότητα ανά μερίδα].
 //   Όπου το πρόγραμμα λέει "ή", υπάρχουν επιλογές (options).
 //   Οι ποσότητες που δεν έγραφε το πρόγραμμα (γραμμάρια κοτόπουλου, ρυζιού...) είναι
@@ -25,11 +27,11 @@ export const ITEMS = [
   { id: 'pennes', name: 'Μακαρόνια πέννες', store: 'super', unit: 'g', pack: { size: 500, label: '1 πακέτο 500 g' } },
   { id: 'tyri', name: 'Τυρί τριμμένο', store: 'super', unit: 'g', pack: { size: 200, label: '1 σακουλάκι 200 g' } },
   // Λαϊκή
-  { id: 'avga', name: 'Αυγά', store: 'laiki', unit: 'pcs', pack: { size: 30, label: '1 θήκη 30' } },
-  { id: 'bananes', name: 'Μπανάνες', store: 'laiki', unit: 'pcs', pack: { size: 7, label: '1 κιλό (~7)' } },
-  { id: 'ntomates', name: 'Ντομάτες', store: 'laiki', unit: 'pcs', pack: { size: 6, label: '1 κιλό (~6)' } },
-  { id: 'avokanto', name: 'Αβοκάντο', store: 'laiki', unit: 'pcs', pack: { size: 2, label: '2 τεμάχια' }, optional: true },
-  { id: 'patates', name: 'Πατάτες', store: 'laiki', unit: 'pcs', pack: { size: 12, label: '2 κιλά (~12)' } },
+  { id: 'avga', name: 'Αυγά', store: 'laiki', unit: 'pcs', per: ['αυγό', 'αυγά'], pack: { size: 30, label: '1 θήκη 30' } },
+  { id: 'bananes', name: 'Μπανάνες', store: 'laiki', unit: 'pcs', per: ['μπανάνα', 'μπανάνες'], gEach: 120, pack: { size: 8, label: '1 κιλό (~8)' } },
+  { id: 'ntomates', name: 'Ντομάτες', store: 'laiki', unit: 'pcs', per: ['ντομάτα', 'ντομάτες'], gEach: 150, pack: { size: 7, label: '1 κιλό (~7)' } },
+  { id: 'avokanto', name: 'Αβοκάντο', store: 'laiki', unit: 'pcs', per: ['αβοκάντο', 'αβοκάντο'], gEach: 200, pack: { size: 2, label: '2 αβοκάντο' }, optional: true },
+  { id: 'patates', name: 'Πατάτες', store: 'laiki', unit: 'pcs', per: ['πατάτα', 'πατάτες'], gEach: 170, pack: { size: 12, label: '2 κιλά (~12)' } },
   // Κλουβάτος
   { id: 'stithos', name: 'Στήθος κοτόπουλο', store: 'klouvatos', unit: 'g', pack: { size: 1000, label: '1 kg', price: 4.95, count: 2 } },
   { id: 'kotompoukies', name: 'Κοτομπουκιές με πανάρισμα μοτσαρέλας', store: 'klouvatos', unit: 'g', pack: { size: 500, label: '500 g', price: 7.2 } },

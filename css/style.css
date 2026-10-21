@@ -2606,3 +2606,10 @@ button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: n
 .mp-stepper-val { min-width: 28px; text-align: center; font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; }
 .mp-grams { display: flex; align-items: center; gap: 6px; }
 .mp-extra-qty { margin-top: 4px; }
+
+/* Λαϊκή: κομμάτια ή κιλά */
+.mp-have { margin: 10px 0 0; font-size: 16px; }
+.mp-mode { margin-top: 14px; }
+.mp-amount { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 16px; }
+.mp-amount-val { min-width: 150px; text-align: center; font: 750 24px var(--display); font-variant-numeric: tabular-nums; }
+.mp-amount-note { min-height: 20px; margin-top: 6px !important; text-align: center; }
