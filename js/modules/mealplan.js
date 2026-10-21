@@ -320,7 +320,7 @@ function laikiSheet(item, after) {
     <p class="muted small-print mp-amount-note"></p>
     <div class="stack">
       <button class="btn btn-block" data-add></button>
-      <button class="btn btn-quiet btn-block" data-set></button>
+      <button class="btn btn-quiet btn-block" data-set>Save</button>
       <button class="link-btn centered" data-zero>Ran out (0)</button>
     </div>`,
   (root, close) => {
@@ -333,7 +333,6 @@ function laikiSheet(item, after) {
       root.querySelector('[data-amt="-1"]').disabled = mode === 'kg' ? kg <= KG_STEP : pcs <= 1;
       root.querySelector('[data-amt="1"]').disabled = mode === 'kg' ? kg >= 5 : pcs >= 20;
       root.querySelector('[data-add]').textContent = `I bought ${countText(item, n)}`;
-      root.querySelector('[data-set]').textContent = `I have ${countText(item, n)} in total`;
     };
     paint();
     root.addEventListener('change', (ev) => { if (ev.target.name === 'mpmode') { mode = ev.target.value; paint(); } });
