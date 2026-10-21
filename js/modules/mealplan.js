@@ -1,7 +1,7 @@
 // Calories: το εβδομαδιαίο πρόγραμμα φαγητού, τα ψώνια και η καταγραφή.
 //
 // ΚΑΡΤΕΛΕΣ
-//   Meal plan   ΜΟΝΟ το πρόγραμμα της εβδομάδας (data/mealplan.js), η σημερινή μέρα πρώτη
+//   Meal plan   ΜΟΝΟ το πρόγραμμα της εβδομάδας (data/mealplan.js), Δευτέρα πρώτη, η σημερινή μπλε
 //   Groceries   τι έχεις στο σπίτι, ανά μαγαζί (Υπεραγορά / Λαϊκή / Κλουβάτος)
 //   Track       "Το έφαγα" σε κάθε γεύμα της μέρας: τα υλικά του αφαιρούνται από τα Groceries
 //
@@ -16,11 +16,14 @@
 //   stock    { itemId: ποσότητα }  (g ή τεμάχια). Χωρίς τιμή = δεν το έχεις ορίσει ακόμα
 //   alerted  { itemId: true }      για ποια έχουμε ήδη ειδοποιήσει (μέχρι να τα ξαναγοράσεις)
 //   track    { "2026-10-21": { breakfast: { choice, used: { itemId: qty } } | { skipped: true } } }
+//   products { itemId: { code, name, brand, quantity, image } }  το συγκεκριμένο προϊόν που αγοράζεις
+//            (από scan του barcode, με στοιχεία από το Open Food Facts)
 
 import { register } from '../core/registry.js';
 import { moduleStore } from '../core/storage.js';
 import { escapeHtml, icon, toast, openSheet, navigate } from '../core/router.js';
 import { haptic } from '../core/feedback.js';
+import { scanBarcode, lookupProduct } from '../core/scanner.js';
 import { STORES, ITEMS, MEALS, DAYS, PLAN } from '../../data/mealplan.js';
 
 const store = moduleStore('mealplan');
@@ -34,6 +37,7 @@ const ICONS = {
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   flame: '<path d="M12 21c-3.9 0-6.5-2.7-6.5-6.3 0-3.4 2.4-5.4 3.6-8.2.6 1.6 1.4 2.6 2.6 3.3.2-2.6 1.3-5 3-6.8.3 3.2 4.3 5.9 4.3 11 0 4-2.9 7-7 7z"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
+  barcode: '<path d="M4 5v14M7 5v14M10.5 5v14M13 5v14M16.5 5v14M20 5v14"/>',
 };
 
 // ===================== Βοηθητικά =====================
@@ -46,6 +50,10 @@ const storeById = (id) => STORES.find((s) => s.id === id);
 
 const getStock = () => store.get('stock', {});
 const getTrack = () => store.get('track', {});
+const getProducts = () => store.get('products', {});
+
+// "Barilla Penne Rigate Nº73 · 500 g"
+const productText = (p) => [p.brand, p.name].filter(Boolean).join(' ') + (p.quantity ? ` · ${p.quantity}` : '');
 
 // "250 g", "1,2 kg", "12 τεμ."
 function qtyText(item, q) {
@@ -127,13 +135,12 @@ function mealOfDay(dayIdx, mealId) {
 
 function renderPlan(el) {
   const today = weekday(dateKey(Date.now()));
-  const order = [...Array(7).keys()].map((i) => (today + i) % 7); // από σήμερα και μετά
   el.innerHTML = `
-    <div class="mp-days">${order.map((d, k) => `
-      <section class="mp-day ${k === 0 ? 'today' : ''}" style="--i:${k}">
+    <div class="mp-days">${DAYS.map((_, d) => `
+      <section class="mp-day ${d === today ? 'today' : ''}" style="--i:${d}" ${d === today ? 'id="mp-today"' : ''}>
         <header class="mp-day-head">
           <h2>${DAYS[d]}</h2>
-          ${k === 0 ? '<span class="mp-today">Σήμερα</span>' : k === 1 ? '<span class="mp-tomorrow">Αύριο</span>' : ''}
+          ${d === today ? '<span class="mp-today">Σήμερα</span>' : d === (today + 1) % 7 ? '<span class="mp-tomorrow">Αύριο</span>' : ''}
         </header>
         <ul class="mp-meals">${MEALS.map((m) => `
           <li><span class="mp-emoji" aria-hidden="true">${m.emoji}</span>
@@ -153,6 +160,7 @@ function stockSheet(item, after) {
   openSheet(`
     <h2>${escapeHtml(item.name)}</h2>
     <p class="muted">${storeById(item.store).emoji} ${storeById(item.store).name}${WEEKLY[item.id] ? ` · the plan uses ${qtyText(item, WEEKLY[item.id])} a week` : ''}</p>
+    <div class="mp-product"></div>
     <p class="field-label">You have now (${item.unit === 'g' ? 'grams' : 'pieces'})</p>
     <div class="mp-qty">
       <button class="mp-round" data-step="-1" aria-label="Less">−</button>
@@ -165,12 +173,57 @@ function stockSheet(item, after) {
     </div>
     <div class="stack"><button class="btn btn-block" data-save>Save</button></div>`,
   (root, close) => {
-    const input = root.querySelector('input');
+    const input = root.querySelector('.mp-qty-input');
     const val = () => Math.max(0, parseFloat(String(input.value).replace(',', '.')) || 0);
     input.addEventListener('focus', () => input.select());
+    const box = root.querySelector('.mp-product');
+    // Το προϊόν που αγοράζεις: φωτογραφία, μάρκα, όνομα, συσκευασία, barcode
+    const paintProduct = (busy = '') => {
+      const p = getProducts()[item.id];
+      box.innerHTML = busy ? `<p class="muted mp-product-busy">${busy}</p>` : p ? `
+        <div class="mp-product-card">
+          ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" loading="lazy">` : `<span class="mp-product-noimg">${icon(ICONS.cart)}</span>`}
+          <span class="mp-product-text"><span class="mp-product-label muted">Buy this</span>
+            <strong>${escapeHtml(productText(p))}</strong>
+            <span class="muted mp-code">${escapeHtml(p.code)}</span></span>
+        </div>
+        <div class="mp-product-actions">
+          <button class="link-btn" data-scan>Scan another</button>
+          <button class="link-btn" data-forget>Remove</button>
+        </div>` : `
+        <button class="btn btn-quiet btn-block mp-scan-btn" data-scan>${icon(ICONS.barcode)} Scan barcode</button>
+        <p class="muted small-print">Scan the product you buy, so you know exactly what to get.</p>`;
+    };
+    paintProduct();
+    const scan = async () => {
+      const code = await scanBarcode();
+      if (!code) return;
+      paintProduct('Looking up the product…');
+      let p = null;
+      try {
+        p = await lookupProduct(code);
+      } catch {
+        toast('No connection. Saved the barcode only');
+      }
+      if (!p) {
+        const name = (prompt('Product not found in Open Food Facts. What is it? (e.g. Barilla penne 500 g)') || '').trim();
+        p = { code, name: name || `Barcode ${code}`, brand: '', quantity: '', image: '' };
+      }
+      store.update('products', (all) => ({ ...all, [item.id]: p }), {});
+      haptic();
+      paintProduct();
+      after();
+    };
     root.addEventListener('click', (ev) => {
       const b = ev.target.closest('button');
       if (!b) return;
+      if ('scan' in b.dataset) { scan(); return; }
+      if ('forget' in b.dataset) {
+        store.update('products', (all) => { const c = { ...all }; delete c[item.id]; return c; }, {});
+        paintProduct();
+        after();
+        return;
+      }
       if (b.dataset.step) input.value = Math.max(0, val() + Number(b.dataset.step) * step);
       else if (b.dataset.pack) input.value = val() + item.pack.size;
       else if ('zero' in b.dataset) input.value = 0;
@@ -230,7 +283,7 @@ function renderGroceries(el) {
           if (!items.length) return '';
           return `
           <div class="mp-alert-store">
-            <span><strong>${s.emoji} ${s.name}:</strong> ${items.map((i) => escapeHtml(i.name)).join(', ')}</span>
+            <span><strong>${s.emoji} ${s.name}:</strong> ${items.map((i) => escapeHtml(getProducts()[i.id] ? productText(getProducts()[i.id]) : i.name)).join(', ')}</span>
             <button class="btn btn-small" data-bought="${s.id}">Bought</button>
           </div>`;
         }).join('')}
@@ -244,12 +297,15 @@ function renderGroceries(el) {
         const q = stock[i.id];
         const d = q === undefined ? null : daysLeft(i.id, q);
         const lowNow = isLow(i, stock);
+        const prod = getProducts()[i.id];
         const sub = q === undefined ? 'Tap to set what you have'
           : d === null ? (i.optional ? 'Optional' : 'Not in the plan')
             : d < 1 ? 'Runs out today' : `Enough for ~${Math.floor(d)} ${Math.floor(d) === 1 ? 'day' : 'days'}`;
         return `
         <li><button class="row" data-item="${i.id}">
+          ${prod && prod.image ? `<img class="mp-thumb" src="${escapeHtml(prod.image)}" alt="" loading="lazy">` : ''}
           <span class="row-text"><span class="row-title">${escapeHtml(i.name)}${i.optional ? ' <span class="muted">(προαιρετικό)</span>' : ''}</span>
+            ${prod ? `<span class="row-sub mp-prod-line">${escapeHtml(productText(prod))}</span>` : ''}
             <span class="row-sub ${lowNow ? 'is-low' : ''}">${sub}</span></span>
           <span class="row-value small-value ${lowNow ? 'is-low' : ''}">${qtyText(i, q)}</span>
         </button></li>`;

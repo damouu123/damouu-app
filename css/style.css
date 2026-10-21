@@ -2544,3 +2544,33 @@ button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: n
 .mp-small-input { width: 90px; min-height: 42px; padding: 0 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; text-align: center; }
 .mp-select { -webkit-appearance: none; appearance: none; }
 .mp-extra { margin-top: 14px; }
+
+/* ===== Barcode: προϊόν που αγοράζεις + οθόνη σάρωσης (js/core/scanner.js) ===== */
+.mp-product { margin-top: 12px; }
+.mp-scan-btn .icon { width: 22px; height: 22px; }
+.mp-product-card { display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 16px; background: var(--surface); }
+.mp-product-card img, .mp-product-noimg { flex: none; width: 64px; height: 64px; border-radius: 12px; background: #fff; object-fit: contain; display: grid; place-items: center; color: var(--blue); }
+.mp-product-text { display: grid; gap: 2px; min-width: 0; }
+.mp-product-label { font-size: 12px; font-weight: 650; }
+.mp-code { font-size: 12px; font-variant-numeric: tabular-nums; }
+.mp-product-actions { display: flex; gap: 18px; margin-top: 4px; }
+.mp-product-busy { padding: 10px 0; }
+.mp-thumb { flex: none; width: 40px; height: 40px; border-radius: 10px; background: #fff; object-fit: contain; }
+.mp-prod-line { color: var(--blue); }
+
+.scan-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 300; /* πάνω και από τα φύλλα */
+  background: #000;
+  animation: fade-in 0.25s ease;
+}
+.scan-screen.closing { animation: fade-out 0.25s ease forwards; }
+.scan-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.scan-frame { position: absolute; left: 50%; top: 42%; width: min(78vw, 320px); height: 160px; transform: translate(-50%, -50%); border-radius: 22px; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.45); border: 3px solid rgba(255, 255, 255, 0.9); }
+.scan-frame i { position: absolute; left: 8%; right: 8%; top: 50%; height: 2px; background: #FF5A5A; box-shadow: 0 0 12px #FF5A5A; animation: scan-line 1.6s ease-in-out infinite; }
+@keyframes scan-line { 0%, 100% { transform: translateY(-50px); } 50% { transform: translateY(50px); } }
+.scan-hint { position: absolute; left: 20px; right: 20px; top: calc(42% + 100px); margin: 0; color: #fff; text-align: center; font-weight: 600; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6); }
+.scan-screen.no-camera .scan-frame { display: none; }
+.scan-actions { position: absolute; left: 20px; right: 20px; bottom: calc(var(--safe-bottom) + 24px); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.scan-actions .btn-quiet { background: rgba(255, 255, 255, 0.16); color: #fff; border-color: rgba(255, 255, 255, 0.3); }
