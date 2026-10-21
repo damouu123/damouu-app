@@ -2598,3 +2598,11 @@ button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: n
 .mp-swipe[data-side="left"] .mp-swipe-del.left, .mp-swipe[data-side="right"] .mp-swipe-del.right { opacity: 1; }
 .mp-product-actions { align-items: center; }
 .mp-swipe-hint { margin: 0; }
+
+/* −/+ για τεμάχια (1 έως 20) */
+.mp-stepper { display: flex; align-items: center; gap: 10px; }
+.mp-round.small { width: 36px; height: 36px; font-size: 20px; }
+.mp-round:disabled { opacity: 0.3; cursor: default; }
+.mp-stepper-val { min-width: 28px; text-align: center; font-size: 20px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.mp-grams { display: flex; align-items: center; gap: 6px; }
+.mp-extra-qty { margin-top: 4px; }

@@ -400,6 +400,38 @@ function undo(mealId, after) {
   after();
 }
 
+// Ποσότητα: για τεμάχια −/+ από 1 έως 20, για γραμμάρια πεδίο
+const PCS_MIN = 1;
+const PCS_MAX = 20;
+function qtyControl(item, value) {
+  if (item.unit === 'g') {
+    return `<span class="mp-grams"><input class="mp-small-input" data-qty="${item.id}" inputmode="decimal" value="${value}"><span class="muted">g</span></span>`;
+  }
+  const v = Math.min(PCS_MAX, Math.max(PCS_MIN, Math.round(value) || PCS_MIN));
+  return `
+    <span class="mp-stepper" data-stepper="${item.id}">
+      <button class="mp-round small" data-dec aria-label="Less" ${v <= PCS_MIN ? 'disabled' : ''}>−</button>
+      <span class="mp-stepper-val" data-qty="${item.id}" data-value="${v}" aria-live="polite">${v}</span>
+      <button class="mp-round small" data-inc aria-label="More" ${v >= PCS_MAX ? 'disabled' : ''}>+</button>
+    </span>`;
+}
+// −/+ μέσα σε ένα φύλλο
+function bindSteppers(root) {
+  root.addEventListener('click', (ev) => {
+    const b = ev.target.closest('[data-dec], [data-inc]');
+    if (!b) return;
+    const box = b.closest('[data-stepper]');
+    const out = box.querySelector('[data-value]');
+    const v = Math.min(PCS_MAX, Math.max(PCS_MIN, Number(out.dataset.value) + ('inc' in b.dataset ? 1 : -1)));
+    out.dataset.value = v;
+    out.textContent = v;
+    box.querySelector('[data-dec]').disabled = v <= PCS_MIN;
+    box.querySelector('[data-inc]').disabled = v >= PCS_MAX;
+    haptic();
+  });
+}
+const readQty = (el) => (el.dataset.value !== undefined ? Number(el.dataset.value) : Math.max(0, parseFloat(String(el.value).replace(',', '.')) || 0));
+
 // Αλλαγή ποσοτήτων πριν το "Το έφαγα" (π.χ. έφαγες 250 g κοτόπουλο αντί για 200)
 function adjustSheet(mealId, choiceIdx, uses, after) {
   openSheet(`
@@ -409,15 +441,18 @@ function adjustSheet(mealId, choiceIdx, uses, after) {
       return `
       <li><div class="row row-static">
         <span class="row-text"><span class="row-title">${escapeHtml(it.name)}</span><span class="row-sub">${it.unit === 'g' ? 'grams' : 'pieces'}</span></span>
-        <input class="mp-small-input" data-id="${id}" inputmode="decimal" value="${q}">
+        ${qtyControl(it, q)}
       </div></li>`;
     }).join('')}</ul>
     <div class="stack"><button class="btn btn-block" data-save>Ate it</button></div>`,
-  (root, close) => root.querySelector('[data-save]').addEventListener('click', () => {
-    const newUses = [...root.querySelectorAll('[data-id]')].map((i) => [i.dataset.id, Math.max(0, parseFloat(String(i.value).replace(',', '.')) || 0)]);
-    close();
-    eat(mealId, choiceIdx, newUses, after);
-  }));
+  (root, close) => {
+    bindSteppers(root);
+    root.querySelector('[data-save]').addEventListener('click', () => {
+      const newUses = [...root.querySelectorAll('[data-qty]')].map((i) => [i.dataset.qty, readQty(i)]);
+      close();
+      eat(mealId, choiceIdx, newUses, after);
+    });
+  });
 }
 
 // Κάτι εκτός προγράμματος (π.χ. 2 αυγά παραπάνω)
@@ -427,11 +462,18 @@ function extraSheet(after) {
     <p class="muted">It is taken off your stock.</p>
     <label class="field"><span>Item</span>
       <select class="mp-select">${ITEMS.map((i) => `<option value="${i.id}">${escapeHtml(i.name)}</option>`).join('')}</select></label>
-    <label class="field"><span>Quantity (grams or pieces)</span><input class="mp-extra-qty" inputmode="decimal" value="1"></label>
+    <div class="field"><span>Quantity</span><div class="mp-extra-qty"></div></div>
     <div class="stack"><button class="btn btn-block" data-save>Take off stock</button></div>`,
-  (root, close) => root.querySelector('[data-save]').addEventListener('click', () => {
-    const id = root.querySelector('select').value;
-    const q = Math.max(0, parseFloat(String(root.querySelector('.mp-extra-qty').value).replace(',', '.')) || 0);
+  (root, close) => {
+  bindSteppers(root);
+  const select = root.querySelector('select');
+  const qtyBox = root.querySelector('.mp-extra-qty');
+  const paintQty = () => { const it = itemById(select.value); qtyBox.innerHTML = qtyControl(it, it.unit === 'g' ? 100 : 1); };
+  paintQty();
+  select.addEventListener('change', paintQty);
+  root.querySelector('[data-save]').addEventListener('click', () => {
+    const id = select.value;
+    const q = readQty(qtyBox.querySelector('[data-qty]'));
     if (!q) { toast('Enter a quantity'); return; }
     applyStock({ [id]: -q });
     const all = getTrack();
@@ -442,7 +484,8 @@ function extraSheet(after) {
     toast(`${itemById(id).name}: −${amountText(itemById(id), q)}`);
     close();
     after();
-  }));
+  });
+  });
 }
 
 function renderTrack(el) {

@@ -29,7 +29,7 @@ export const ITEMS = [
   { id: 'bananes', name: 'Μπανάνες', store: 'laiki', unit: 'pcs', pack: { size: 7, label: '1 κιλό (~7)' } },
   { id: 'ntomates', name: 'Ντομάτες', store: 'laiki', unit: 'pcs', pack: { size: 6, label: '1 κιλό (~6)' } },
   { id: 'avokanto', name: 'Αβοκάντο', store: 'laiki', unit: 'pcs', pack: { size: 2, label: '2 τεμάχια' }, optional: true },
-  { id: 'patates', name: 'Πατάτες', store: 'laiki', unit: 'g', pack: { size: 2000, label: '2 κιλά' } },
+  { id: 'patates', name: 'Πατάτες', store: 'laiki', unit: 'pcs', pack: { size: 12, label: '2 κιλά (~12)' } },
   // Κλουβάτος
   { id: 'stithos', name: 'Στήθος κοτόπουλο', store: 'klouvatos', unit: 'g', pack: { size: 1000, label: '1 kg', price: 4.95, count: 2 } },
   { id: 'kotompoukies', name: 'Κοτομπουκιές με πανάρισμα μοτσαρέλας', store: 'klouvatos', unit: 'g', pack: { size: 500, label: '500 g', price: 7.2 } },
@@ -42,7 +42,7 @@ const CHICKEN = 200;  // g στήθος
 const RICE = 100;     // g ρύζι (ωμό)
 const ORZO = 100;     // g κριθαράκι (ωμό)
 const PASTA = 100;    // g πέννες (ωμές)
-const POTATO = 300;   // g πατάτες
+const POTATO = 2;     // πατάτες (τεμάχια, μέτριες)
 const NUGGETS = 250;  // g κοτομπουκιές
 
 export const MEALS = [
