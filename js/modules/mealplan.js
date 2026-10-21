@@ -365,28 +365,55 @@ function laikiSheet(item, after) {
 function boughtSheet(storeId, after) {
   const s = storeById(storeId);
   const items = lowItems().filter((i) => i.store === storeId);
+  // Πόσα πήρες από το καθένα: λαϊκή σε κομμάτια (0 έως 20), τα άλλα σε πακέτα (0 έως 10).
+  // 0 = δεν το πήρες.
+  const unitOf = (i) => (i.per ? 1 : i.pack.size);
+  const maxOf = (i) => (i.per ? 20 : 10);
+  const label = (i, n) => (i.per ? countText(i, n) : `${n} × ${i.pack.label}`);
+  const qty = Object.fromEntries(items.map((i) => [i.id, i.per ? Math.min(20, i.pack.size) : (i.pack.count || 1)]));
   openSheet(`
     <h2>${s.emoji} Bought at ${s.name}</h2>
-    <p class="muted">Adds what you usually buy to your stock.</p>
-    <ul class="list rules-list">${items.map((i) => `
-      <li><label class="row toggle-row">
+    <p class="muted">How many did you buy? Set 0 for anything you didn't get.</p>
+    <ul class="list rules-list mp-bought">${items.map((i) => `
+      <li><div class="row row-static">
         <span class="row-text"><span class="row-title">${escapeHtml(i.name)}</span>
-          <span class="row-sub">+ ${i.pack.count ? `${i.pack.count} × ` : ''}${escapeHtml(i.pack.label)}</span></span>
-        <input type="checkbox" class="switch" data-item="${i.id}" checked>
-      </label></li>`).join('')}
+          <span class="row-sub" data-sub="${i.id}"></span></span>
+        <span class="mp-stepper">
+          <button class="mp-round small" data-b="${i.id}" data-d="-1" aria-label="Less">−</button>
+          <span class="mp-stepper-val" data-v="${i.id}"></span>
+          <button class="mp-round small" data-b="${i.id}" data-d="1" aria-label="More">+</button>
+        </span>
+      </div></li>`).join('')}
     </ul>
     <div class="stack"><button class="btn btn-block" data-save>Add to stock</button></div>`,
-  (root, close) => root.querySelector('[data-save]').addEventListener('click', () => {
-    const deltas = {};
-    root.querySelectorAll('[data-item]:checked').forEach((c) => {
-      const i = itemById(c.dataset.item);
-      deltas[i.id] = i.pack.size * (i.pack.count || 1);
+  (root, close) => {
+    const paint = (i) => {
+      const n = qty[i.id];
+      root.querySelector(`[data-v="${i.id}"]`).textContent = n;
+      root.querySelector(`[data-sub="${i.id}"]`).textContent = n ? `+ ${label(i, n)}` : 'Not bought';
+      root.querySelector(`[data-b="${i.id}"][data-d="-1"]`).disabled = n <= 0;
+      root.querySelector(`[data-b="${i.id}"][data-d="1"]`).disabled = n >= maxOf(i);
+    };
+    items.forEach(paint);
+    root.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('button');
+      if (!btn || btn.disabled) return;
+      if (btn.dataset.b) {
+        const i = itemById(btn.dataset.b);
+        qty[i.id] = Math.min(maxOf(i), Math.max(0, qty[i.id] + Number(btn.dataset.d)));
+        haptic();
+        paint(i);
+      } else if ('save' in btn.dataset) {
+        const deltas = {};
+        for (const i of items) if (qty[i.id]) deltas[i.id] = qty[i.id] * unitOf(i);
+        if (!Object.keys(deltas).length) { toast('Nothing to add'); return; }
+        applyStock(deltas);
+        toast('Stock updated');
+        close();
+        after();
+      }
     });
-    applyStock(deltas);
-    toast('Stock updated');
-    close();
-    after();
-  }));
+  });
 }
 
 function renderGroceries(el) {
