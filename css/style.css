@@ -2613,3 +2613,10 @@ button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: n
 .mp-amount { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 16px; }
 .mp-amount-val { min-width: 150px; text-align: center; font: 750 24px var(--display); font-variant-numeric: tabular-nums; }
 .mp-amount-note { min-height: 20px; margin-top: 6px !important; text-align: center; }
+
+/* Σάρωση: "Take a photo" σε όλο το πλάτος, από κάτω τα άλλα δύο */
+.scan-actions .scan-photo { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+/* Προϊόν που δεν βρέθηκε: γράφεις το όνομα */
+.mp-name-product { display: grid; gap: 8px; }
+.mp-name-product p { margin: 0; }
+.mp-name-input { width: 100%; min-height: 46px; padding: 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; }

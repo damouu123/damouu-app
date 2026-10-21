@@ -130,6 +130,18 @@ function applyStock(deltas) {
   notifyLow();
 }
 
+// Reset: σαν να μην έχεις γράψει ποτέ ποσότητα (στη λίστα φαίνεται "—")
+function resetStock(item) {
+  const stock = getStock();
+  delete stock[item.id];
+  store.set('stock', stock);
+  const alerted = store.get('alerted', {});
+  delete alerted[item.id];
+  store.set('alerted', alerted);
+  haptic();
+  toast(`${item.name}: reset`);
+}
+
 // ===================== Meal plan (αρχική) =====================
 
 function mealOfDay(dayIdx, mealId) {
@@ -174,6 +186,7 @@ function stockSheet(item, after) {
     <div class="chips">
       <button class="chip" data-pack="1">+ ${escapeHtml(item.pack.label)}${item.pack.price ? ` (${item.pack.price.toFixed(2).replace('.', ',')} €)` : ''}</button>
       <button class="chip" data-zero>Ran out (0)</button>
+      ${cur === undefined ? '' : '<button class="chip" data-reset>Reset</button>'}
     </div>
     <div class="stack"><button class="btn btn-block" data-save>Save</button></div>`,
   (root, close) => {
@@ -246,15 +259,29 @@ function stockSheet(item, after) {
       if (!code) return;
       paintProduct('Looking up the product…');
       let p = null;
+      let offline = false;
       try {
         p = await lookupProduct(code);
       } catch {
-        toast('No connection. Saved the barcode only');
+        offline = true;
       }
-      if (!p) {
-        const name = (prompt('Product not found in Open Food Facts. What is it? (e.g. Barilla penne 500 g)') || '').trim();
-        p = { code, name: name || `Barcode ${code}`, brand: '', quantity: '', image: '' };
-      }
+      if (p) { keepProduct(p); return; }
+      // Δεν βρέθηκε (πολλά ελληνικά προϊόντα δεν υπάρχουν στη βάση): γράφεις εσύ το όνομα
+      box.innerHTML = `
+        <div class="mp-name-product">
+          <p class="small-print">${offline ? 'No connection, so I could not look it up.' : 'This product is not in Open Food Facts yet.'}
+            What is it? <span class="muted mp-code">${escapeHtml(code)}</span></p>
+          <input class="mp-name-input" placeholder="e.g. Μύλοι Αγίου Γεωργίου ρύζι 500 g" aria-label="Product name">
+          <div class="chips"><button class="chip" data-name-save>Save product</button><button class="chip" data-name-cancel>Cancel</button></div>
+        </div>`;
+      const input = box.querySelector('.mp-name-input');
+      input.focus();
+      const saveName = () => keepProduct({ code, name: input.value.trim() || `Barcode ${code}`, brand: '', quantity: '', image: '' });
+      input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') saveName(); });
+      box.querySelector('[data-name-save]').addEventListener('click', saveName);
+      box.querySelector('[data-name-cancel]').addEventListener('click', () => paintProduct());
+    };
+    const keepProduct = (p) => {
       store.update('products', (all) => ({ ...all, [item.id]: p }), {});
       haptic();
       paintProduct();
@@ -277,6 +304,7 @@ function stockSheet(item, after) {
         }, 280);
         return;
       }
+      if ('reset' in b.dataset) { resetStock(item); close(); after(); return; }
       if (b.dataset.step) input.value = Math.max(0, val() + Number(b.dataset.step) * step);
       else if (b.dataset.pack) input.value = val() + item.pack.size;
       else if ('zero' in b.dataset) input.value = 0;
@@ -322,6 +350,7 @@ function laikiSheet(item, after) {
       <button class="btn btn-block" data-add></button>
       <button class="btn btn-quiet btn-block" data-set>Save</button>
       <button class="link-btn centered" data-zero>Ran out (0)</button>
+      ${have === undefined ? '' : '<button class="link-btn centered" data-reset>Reset</button>'}
     </div>`,
   (root, close) => {
     const val = root.querySelector('.mp-amount-val');
@@ -357,6 +386,7 @@ function laikiSheet(item, after) {
       } else if ('add' in b.dataset) save((getStock()[item.id] || 0) + amount(), `+${countText(item, amount())}`);
       else if ('set' in b.dataset) save(amount(), `${item.name}: ${countText(item, amount())}`);
       else if ('zero' in b.dataset) save(0, `${item.name}: ran out`);
+      else if ('reset' in b.dataset) { resetStock(item); close(); after(); }
     });
   });
 }
