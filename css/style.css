@@ -2427,3 +2427,120 @@ button.ft-range .icon { width: 18px; height: 18px; }
 .ft-hist-card .ft-hist-sets { margin-top: 2px; animation: rise 0.35s var(--ease) backwards; }
 button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: none; font: inherit; font-size: 15px; cursor: pointer; }
 .ft-more { margin-top: 12px; }
+
+/* =====================================================================
+   Calories: Meal plan / Groceries / Track (js/modules/mealplan.js)
+   ===================================================================== */
+/* Meal plan: μία κάρτα ανά μέρα, η σημερινή μπλε */
+.mp-days { display: grid; gap: 12px; margin-top: 4px; }
+.mp-day {
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  animation: rise 0.45s var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 40ms);
+}
+.mp-day.today {
+  background: linear-gradient(140deg, #2B90E4 0%, #1B70CA 55%, #1559B0 100%);
+  border: none;
+  color: #fff;
+  box-shadow: 0 16px 34px rgba(27, 112, 202, 0.32);
+  --muted: rgba(255, 255, 255, 0.78);
+}
+.mp-day-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.mp-day-head h2 { margin: 0; font-size: 20px; font-weight: 750; }
+.mp-today, .mp-tomorrow { padding: 3px 10px; border-radius: 999px; font-size: 13px; font-weight: 650; }
+.mp-today { background: rgba(255, 255, 255, 0.22); }
+.mp-tomorrow { background: rgba(31, 127, 214, 0.12); color: var(--blue); }
+.mp-meals { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mp-meals li { display: flex; align-items: flex-start; gap: 10px; }
+.mp-emoji { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: rgba(31, 127, 214, 0.1); font-size: 18px; }
+.mp-day.today .mp-emoji { background: rgba(255, 255, 255, 0.2); }
+.mp-meal-text { display: grid; min-width: 0; font-size: 15px; line-height: 1.35; }
+.mp-meal-title { font-size: 13px; font-weight: 700; color: var(--muted); }
+
+/* Groceries */
+.mp-alert {
+  margin-top: 4px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: linear-gradient(140deg, #F6A04D, #EE7A1F);
+  color: #fff;
+  box-shadow: 0 14px 30px rgba(238, 122, 31, 0.3);
+}
+.mp-alert-title { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 17px; font-weight: 750; }
+.mp-alert-store { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid rgba(255, 255, 255, 0.25); font-size: 15px; }
+.mp-alert-store .btn { flex: none; background: #fff; color: #C25E0F; box-shadow: none; }
+.mp-alert-cost { margin: 6px 0 0; font-size: 13px; opacity: 0.9; }
+.mp-hint { margin-top: 12px; }
+.mp-qty { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 8px 0 12px; }
+.mp-qty-input { width: 130px; min-height: 52px; padding: 0 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); font: 700 26px var(--display); text-align: center; }
+.mp-round {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+  transition: transform 0.3s var(--spring);
+}
+.mp-round:active { transform: scale(0.85); }
+
+/* Track */
+.mp-track-day { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+.mp-track-title { flex: 1; display: grid; text-align: center; }
+.mp-track-title strong { font-size: 20px; }
+.mp-track-title .muted { font-size: 14px; }
+.mp-low-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 18px;
+  background: rgba(238, 122, 31, 0.14);
+  color: #A9520D;
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.mp-low-banner span:nth-child(2) { flex: 1; }
+.mp-track { display: grid; gap: 12px; margin: 14px 0 0; padding: 0; list-style: none; }
+.mp-track-meal {
+  display: flex;
+  gap: 12px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--glass-edge);
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  transition: background-color 0.3s;
+}
+.mp-track-meal.done { background: rgba(23, 149, 90, 0.12); }
+.mp-track-meal.skipped, .mp-track-meal.off { opacity: 0.6; }
+.mp-track-meal .mp-meal-text { flex: 1; gap: 2px; }
+.mp-used { font-size: 13px; }
+.mp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-top: 8px; }
+.mp-actions .link-btn { padding: 4px 0; font-size: 14px; }
+.mp-eat { background: var(--blue); }
+.mp-state { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: var(--success); }
+.mp-state .icon { width: 18px; height: 18px; }
+.mp-track-meal.skipped .mp-state { color: var(--muted); }
+.mp-small-input { width: 90px; min-height: 42px; padding: 0 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font: inherit; font-size: 16px; text-align: center; }
+.mp-select { -webkit-appearance: none; appearance: none; }
+.mp-extra { margin-top: 14px; }
