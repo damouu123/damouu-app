@@ -2574,3 +2574,27 @@ button.ft-card-more { width: 100%; padding: 8px 0 0; border: none; background: n
 .scan-screen.no-camera .scan-frame { display: none; }
 .scan-actions { position: absolute; left: 20px; right: 20px; bottom: calc(var(--safe-bottom) + 24px); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .scan-actions .btn-quiet { background: rgba(255, 255, 255, 0.16); color: #fff; border-color: rgba(255, 255, 255, 0.3); }
+
+/* Σύρσιμο για διαγραφή του σκαναρισμένου προϊόντος */
+.mp-swipe { position: relative; overflow: hidden; border-radius: 16px; }
+.mp-swipe .mp-product-card { position: relative; z-index: 1; background: color-mix(in srgb, var(--navy) 88%, #fff); touch-action: pan-y; cursor: grab; user-select: none; -webkit-user-select: none; }
+.mp-swipe-del {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 96px;
+  border: none;
+  background: rgba(255, 90, 106, 0.16);
+  color: #FF5A6A;
+  font: inherit;
+  font-weight: 750;
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+.mp-swipe-del.left { left: 0; }
+.mp-swipe-del.right { right: 0; }
+.mp-swipe[data-side="left"] .mp-swipe-del.left, .mp-swipe[data-side="right"] .mp-swipe-del.right { opacity: 1; }
+.mp-product-actions { align-items: center; }
+.mp-swipe-hint { margin: 0; }

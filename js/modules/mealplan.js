@@ -180,21 +180,63 @@ function stockSheet(item, after) {
     // Το προϊόν που αγοράζεις: φωτογραφία, μάρκα, όνομα, συσκευασία, barcode
     const paintProduct = (busy = '') => {
       const p = getProducts()[item.id];
+      // Σύρσιμο του "χαπιού" αριστερά ή δεξιά: από κάτω εμφανίζεται το κόκκινο Delete
       box.innerHTML = busy ? `<p class="muted mp-product-busy">${busy}</p>` : p ? `
-        <div class="mp-product-card">
-          ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" loading="lazy">` : `<span class="mp-product-noimg">${icon(ICONS.cart)}</span>`}
-          <span class="mp-product-text"><span class="mp-product-label muted">Buy this</span>
-            <strong>${escapeHtml(productText(p))}</strong>
-            <span class="muted mp-code">${escapeHtml(p.code)}</span></span>
+        <div class="mp-swipe">
+          <button class="mp-swipe-del left" data-forget tabindex="-1">Delete</button>
+          <button class="mp-swipe-del right" data-forget>Delete</button>
+          <div class="mp-product-card" aria-label="${escapeHtml(productText(p))}. Swipe to delete">
+            ${p.image ? `<img src="${escapeHtml(p.image)}" alt="" loading="lazy" draggable="false">` : `<span class="mp-product-noimg">${icon(ICONS.cart)}</span>`}
+            <span class="mp-product-text"><span class="mp-product-label muted">Buy this</span>
+              <strong>${escapeHtml(productText(p))}</strong>
+              <span class="muted mp-code">${escapeHtml(p.code)}</span></span>
+          </div>
         </div>
         <div class="mp-product-actions">
           <button class="link-btn" data-scan>Scan another</button>
-          <button class="link-btn" data-forget>Remove</button>
+          <span class="muted small-print mp-swipe-hint">Swipe it to delete</span>
         </div>` : `
         <button class="btn btn-quiet btn-block mp-scan-btn" data-scan>${icon(ICONS.barcode)} Scan barcode</button>
         <p class="muted small-print">Scan the product you buy, so you know exactly what to get.</p>`;
     };
     paintProduct();
+
+    // Σύρσιμο του προϊόντος (όπως στα μηνύματα του iPhone)
+    const OPEN = 96; // πόσο μένει ανοιχτό, για να φαίνεται το Delete
+    let drag = null; // { x0, dx, base }
+    const card = () => box.querySelector('.mp-product-card');
+    const setX = (x, animate) => {
+      const c = card();
+      if (!c) return;
+      c.style.transition = animate ? 'transform 0.45s var(--spring)' : 'none';
+      c.style.transform = `translateX(${x}px)`;
+      box.querySelector('.mp-swipe').dataset.side = x > 0 ? 'left' : x < 0 ? 'right' : '';
+    };
+    box.addEventListener('pointerdown', (ev) => {
+      const c = ev.target.closest('.mp-product-card');
+      if (!c) return;
+      const m = /translateX\((-?[\d.]+)px\)/.exec(c.style.transform || '');
+      drag = { x0: ev.clientX, dx: 0, base: m ? Number(m[1]) : 0, moved: false };
+      try { c.setPointerCapture(ev.pointerId); } catch { /* συνεχίζουμε και χωρίς */ }
+    });
+    box.addEventListener('pointermove', (ev) => {
+      if (!drag) return;
+      drag.dx = ev.clientX - drag.x0;
+      if (Math.abs(drag.dx) > 6) drag.moved = true;
+      if (drag.moved) setX(Math.max(-140, Math.min(140, drag.base + drag.dx)), false);
+    });
+    const release = () => {
+      if (!drag) return;
+      const x = drag.base + drag.dx;
+      const wasTap = !drag.moved;
+      drag = null;
+      // Μικρό σύρσιμο ή πάτημα όταν είναι ανοιχτό: κλείνει. Αλλιώς μένει ανοιχτό.
+      if (wasTap || Math.abs(x) < 48) setX(0, true);
+      else { setX(x > 0 ? OPEN : -OPEN, true); haptic(); }
+    };
+    box.addEventListener('pointerup', release);
+    box.addEventListener('pointercancel', release);
+
     const scan = async () => {
       const code = await scanBarcode();
       if (!code) return;
@@ -219,9 +261,16 @@ function stockSheet(item, after) {
       if (!b) return;
       if ('scan' in b.dataset) { scan(); return; }
       if ('forget' in b.dataset) {
-        store.update('products', (all) => { const c = { ...all }; delete c[item.id]; return c; }, {});
-        paintProduct();
-        after();
+        // Το "χάπι" φεύγει από την οθόνη και μετά σβήνεται
+        const c = card();
+        if (c) { c.style.transition = 'transform 0.3s ease-in, opacity 0.3s'; c.style.transform = `translateX(${b.classList.contains('left') ? 120 : -120}%)`; c.style.opacity = '0'; }
+        haptic();
+        setTimeout(() => {
+          store.update('products', (all) => { const x = { ...all }; delete x[item.id]; return x; }, {});
+          paintProduct();
+          after();
+          toast('Product removed');
+        }, 280);
         return;
       }
       if (b.dataset.step) input.value = Math.max(0, val() + Number(b.dataset.step) * step);
